@@ -6,8 +6,10 @@ use std::process::Command;
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let header = manifest_dir.join("include").join("srx_inline_hook.h");
+    let include_dir = manifest_dir.join("include");
+    let header = include_dir.join("srx_inline_hook.h");
     println!("cargo:rerun-if-changed={}", header.display());
+    println!("cargo:metadata=include={}", include_dir.display());
     verify_header_version(&header);
 
     let target = env::var("TARGET").expect("TARGET");

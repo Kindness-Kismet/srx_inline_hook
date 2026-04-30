@@ -2,6 +2,7 @@
 name = "srx_inline_hook"
 version = "1.0.0"
 edition = "2024"
+links = "srx_inline_hook"
 
 [package.metadata.android]
 min_api = 31
