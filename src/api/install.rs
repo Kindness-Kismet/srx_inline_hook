@@ -269,7 +269,7 @@ pub(crate) unsafe fn hook_inline_inner(
     }
 
     let shared_launcher = if mode == SwitchMode::Shared {
-        Some(crate::shared_stack::create_launcher(target_ptr)?)
+        Some(shared_stack::create_launcher(target_ptr)?)
     } else {
         None
     };

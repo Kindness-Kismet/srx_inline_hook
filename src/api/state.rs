@@ -7,7 +7,7 @@ pub fn init(mode: HookMode, debuggable: bool) -> Result<(), Errno> {
     let r = runtime::init();
     match &r {
         Ok(()) => {
-            sh_always!(target: "srx_inline_hook", "init ok {}", crate::version::get_version())
+            sh_always!(target: "srx_inline_hook", "init ok {}", version::get_version())
         }
         Err(e) => sh_always!(
             target: "srx_inline_hook",
@@ -144,7 +144,7 @@ impl core::fmt::Display for DiagnoseReport {
 
 pub fn diagnose() -> DiagnoseReport {
     DiagnoseReport {
-        version: crate::version::get_version(),
+        version: version::get_version(),
         mode: get_mode(),
         init_errno: runtime::get_init_errno(),
         tls_errno: tls_errno::get(),
@@ -154,10 +154,10 @@ pub fn diagnose() -> DiagnoseReport {
         active_hooks: switch::active_count(),
         trampoline: trampoline::stats(),
         record_count: recorder::count(),
-        linker_hooks_installed: crate::linker::linker_hooks_installed(),
-        linker_hook_stubs: crate::linker::linker_hook_stub_count(),
-        linker_ctor_hits: crate::linker::linker_ctor_hit_count(),
-        linker_dtor_hits: crate::linker::linker_dtor_hit_count(),
+        linker_hooks_installed: linker::linker_hooks_installed(),
+        linker_hook_stubs: linker::linker_hook_stub_count(),
+        linker_ctor_hits: linker::linker_ctor_hit_count(),
+        linker_dtor_hits: linker::linker_dtor_hit_count(),
         record_error: recorder::has_record_error(),
     }
 }

@@ -3,7 +3,9 @@
 
 use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
+use crate::bytesig;
 use crate::errno::Errno;
+use crate::linker;
 
 static INITED: AtomicBool = AtomicBool::new(false);
 static DEBUG: AtomicBool = AtomicBool::new(false);
@@ -22,10 +24,10 @@ pub fn init() -> Result<(), Errno> {
         INIT_ERRNO.store(Errno::Disabled as i32, Ordering::Release);
         return Err(Errno::Disabled);
     }
-    match crate::bytesig::init() {
+    match bytesig::init() {
         Ok(()) => {
             INIT_ERRNO.store(Errno::Ok as i32, Ordering::Release);
-            match crate::linker::install_linker_hooks() {
+            match linker::install_linker_hooks() {
                 Ok(()) => {
                     INITED.store(true, Ordering::Release);
                     INIT_ERRNO.store(Errno::Ok as i32, Ordering::Release);

@@ -12,8 +12,10 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
 use crate::android;
+use crate::api::{self, HookStub};
 use crate::errno::Errno;
-use crate::switch::SwitchMode;
+use crate::stub;
+use crate::switch::{self, SwitchMode};
 use crate::trampoline;
 
 pub const INTERCEPT_FLAG_FPSIMD_READ: u32 = 1;
@@ -58,7 +60,7 @@ pub struct InterceptorEntry {
 
 pub struct InterceptTarget {
     pub launcher: *mut u8,
-    pub hook_stub: Option<crate::api::HookStub>,
+    pub hook_stub: Option<HookStub>,
     pub flags_union: u32,
     pub entries: Vec<InterceptorEntry>,
 }
@@ -83,7 +85,7 @@ pub fn add(
     pre: Interceptor,
     data: *mut c_void,
     flags: u32,
-) -> Result<crate::api::HookStub, Errno> {
+) -> Result<HookStub, Errno> {
     let mut g = TARGETS.lock().map_err(|_| Errno::NotSupport)?;
     let target_entry = g.entry(target as usize).or_insert_with(|| InterceptTarget {
         launcher: ptr::null_mut(),
@@ -107,8 +109,8 @@ pub fn add(
     });
     target_entry.flags_union |= flags;
     drop(g);
-    let _ = crate::switch::set_interceptors_active(target, true);
-    Ok(crate::api::HookStub {
+    let _ = switch::set_interceptors_active(target, true);
+    Ok(HookStub {
         handle: id as *mut c_void,
     })
 }
@@ -128,7 +130,7 @@ pub fn has_hook(target: *mut u8) -> bool {
         .unwrap_or(false)
 }
 
-pub fn bind_hook(target: *mut u8, hook_stub: crate::api::HookStub) -> Result<(), Errno> {
+pub fn bind_hook(target: *mut u8, hook_stub: HookStub) -> Result<(), Errno> {
     let mut g = TARGETS.lock().map_err(|_| Errno::NotSupport)?;
     let target_entry = g.entry(target as usize).or_insert_with(|| InterceptTarget {
         launcher: ptr::null_mut(),
@@ -138,7 +140,7 @@ pub fn bind_hook(target: *mut u8, hook_stub: crate::api::HookStub) -> Result<(),
     });
     target_entry.hook_stub = Some(hook_stub);
     drop(g);
-    let _ = crate::switch::set_interceptors_active(target, has_entries(target));
+    let _ = switch::set_interceptors_active(target, has_entries(target));
     Ok(())
 }
 
@@ -192,7 +194,7 @@ pub fn unhook_handle(handle: *mut c_void) -> Result<(), Errno> {
         } else {
             (
                 target as *mut u8,
-                crate::api::HookStub {
+                HookStub {
                     handle: ptr::null_mut(),
                 },
                 false,
@@ -200,7 +202,7 @@ pub fn unhook_handle(handle: *mut c_void) -> Result<(), Errno> {
         }
     };
     if last.2 {
-        unsafe { crate::api::unhook_active(last.1, 0) }?;
+        unsafe { api::unhook_active(last.1, 0) }?;
         let mut g = TARGETS.lock().map_err(|_| Errno::NotSupport)?;
         let removed = g.remove(&(last.0 as usize)).ok_or(Errno::UnhookNotFound)?;
         if let Some(launcher) = NonNull::new(removed.launcher) {
@@ -223,7 +225,7 @@ pub fn unhook_handle(handle: *mut c_void) -> Result<(), Errno> {
             .fold(0u32, |acc, entry| acc | entry.flags);
         let has_any = !target_entry.entries.is_empty();
         drop(g);
-        let _ = crate::switch::set_interceptors_active(target, has_any);
+        let _ = switch::set_interceptors_active(target, has_any);
         Ok(())
     }
 }
@@ -251,7 +253,7 @@ pub fn dispatch(target: *mut u8) {
 }
 
 pub fn dispatch_from_stub(stub_handle: *mut c_void) {
-    let Some(body) = crate::stub::get(stub_handle as usize) else {
+    let Some(body) = stub::get(stub_handle as usize) else {
         return;
     };
     dispatch(body.target);

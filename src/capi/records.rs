@@ -7,22 +7,16 @@ unsafe extern "C" fn srx_inline_hook_get_prev_func_impl(
     if func.is_null() {
         return ptr::null_mut();
     }
-    if !crate::shared_stack::has_frame() {
+    if !shared_stack::has_frame() {
         std::process::abort();
     }
-    if let Ok(body) = crate::stub::get(func as usize).ok_or(Errno::UnhookNotFound) {
-        if matches!(
-            body.mode,
-            crate::switch::SwitchMode::Shared | crate::switch::SwitchMode::Intercept
-        ) {
-            crate::shared_stack::ensure_top(body.target, return_address);
+    if let Ok(body) = stub::get(func as usize).ok_or(Errno::UnhookNotFound) {
+        if matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept) {
+            shared_stack::ensure_top(body.target, return_address);
         }
-    } else if let Some((_id, body)) = crate::stub::find_by_new_addr(func as *const c_void, None) {
-        if matches!(
-            body.mode,
-            crate::switch::SwitchMode::Shared | crate::switch::SwitchMode::Intercept
-        ) {
-            crate::shared_stack::ensure_top(body.target, return_address);
+    } else if let Some((_id, body)) = stub::find_by_new_addr(func as *const c_void, None) {
+        if matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept) {
+            shared_stack::ensure_top(body.target, return_address);
         }
     }
     match api::prev_func_by_addr(func as *const c_void) {
@@ -111,7 +105,7 @@ pub unsafe extern "C" fn srx_inline_hook_dlopen(lib_name: *const c_char) -> *mut
         return ptr::null_mut();
     }
     // SAFETY: lib_name NUL 终止；手扫避免被 hook libc strlen 反噬
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         return ptr::null_mut();
     };
     let Ok(lib_owned) = sanitize_name_arg(lib) else {
@@ -136,7 +130,7 @@ pub unsafe extern "C" fn srx_inline_hook_dlsym(
         return ptr::null_mut();
     }
     // SAFETY: sym_name NUL 终止；手扫避免被 hook libc strlen 反噬
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         return ptr::null_mut();
     };
     let Ok(sym_owned) = sanitize_name_arg(sym) else {
@@ -155,7 +149,7 @@ pub unsafe extern "C" fn srx_inline_hook_dlsym_dynsym(
     if sym_name.is_null() {
         return ptr::null_mut();
     }
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         return ptr::null_mut();
     };
     let Ok(sym_owned) = sanitize_name_arg(sym) else {
@@ -173,7 +167,7 @@ pub unsafe extern "C" fn srx_inline_hook_dlsym_symtab(
     if sym_name.is_null() {
         return ptr::null_mut();
     }
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         return ptr::null_mut();
     };
     let Ok(sym_owned) = sanitize_name_arg(sym) else {

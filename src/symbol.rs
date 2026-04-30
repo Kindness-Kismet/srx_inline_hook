@@ -3,6 +3,8 @@
 
 use core::ffi::c_void;
 
+use crate::util::cstr_from_ptr_no_libc;
+
 #[derive(Debug, Clone)]
 pub struct AddrInfo {
     pub lib_path: Option<String>,
@@ -24,7 +26,7 @@ pub fn addr_info(addr: *const c_void) -> Option<AddrInfo> {
         None
     } else {
         // SAFETY: dli_fname 为 NUL 终止字符串；手扫避免走 libc strlen
-        unsafe { crate::util::cstr_from_ptr_no_libc(info.dli_fname) }
+        unsafe { cstr_from_ptr_no_libc(info.dli_fname) }
             .and_then(|s| s.to_str().ok())
             .map(String::from)
     };
@@ -32,7 +34,7 @@ pub fn addr_info(addr: *const c_void) -> Option<AddrInfo> {
         None
     } else {
         // SAFETY: 同上
-        unsafe { crate::util::cstr_from_ptr_no_libc(info.dli_sname) }
+        unsafe { cstr_from_ptr_no_libc(info.dli_sname) }
             .and_then(|s| s.to_str().ok())
             .map(String::from)
     };

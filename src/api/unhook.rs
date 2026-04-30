@@ -82,7 +82,7 @@ unsafe fn unhook_inner(stub: HookStub, _caller_addr: usize) -> Result<(), Errno>
                 }
                 switch_entry.mode = SwitchMode::Intercept;
                 switch::insert_existing(switch_entry)?;
-                if let Some(launcher) = crate::intercept::launcher_of(target_ptr) {
+                if let Some(launcher) = intercept::launcher_of(target_ptr) {
                     unsafe { repatch_head(target_ptr, launcher as *const c_void) }?;
                     return Ok(());
                 }
@@ -257,7 +257,7 @@ pub(crate) fn cleanup_hooks_for_dlinfo(info: &libc::dl_phdr_info) {
                 unsafe { ptr::write(slot, ptr::null()) };
             }
         }
-        crate::intercept::cleanup_target(sw.target);
+        intercept::cleanup_target(sw.target);
         if let Some(tp) = NonNull::new(sw.tramp_addr) {
             let _ = trampoline::release(tp);
         }

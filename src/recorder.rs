@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use bitflags::bitflags;
 use once_cell::sync::Lazy;
 
+use crate::bytesig;
 use crate::errno::Errno;
 use crate::symbol::addr_info;
 use crate::util::basename_of;
@@ -182,7 +183,7 @@ pub fn record_with_meta(
         )
     } else if target != 0 {
         // SAFETY: guard 仅捕信号；addr_info 对任意 *const c_void 输入安全
-        let info = unsafe { crate::bytesig::guard(|| addr_info(target as *const c_void)) }
+        let info = unsafe { bytesig::guard(|| addr_info(target as *const c_void)) }
             .ok()
             .flatten();
         info.map(|i| {
@@ -402,7 +403,7 @@ fn append_error_record(out: &mut String, items: RecordItems) {
 
 fn default_caller_lib_name_by_addr(addr: usize) -> Option<String> {
     // SAFETY: guard 仅捕信号；addr_info 对任意 *const c_void 输入安全
-    let info = unsafe { crate::bytesig::guard(|| addr_info(addr as *const c_void)) }
+    let info = unsafe { bytesig::guard(|| addr_info(addr as *const c_void)) }
         .ok()
         .flatten()?;
     normalized_basename(info.lib_path.as_deref())

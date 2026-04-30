@@ -8,10 +8,18 @@ mod prelude {
     pub(super) use core::ffi::{CStr, c_char, c_int, c_void};
     pub(super) use core::ptr;
 
+    pub(super) use crate::android;
     pub(super) use crate::api::{self, HookMode, HookStub, HookedCallback};
+    pub(super) use crate::dlcb::{self, DlInfoCallback};
     pub(super) use crate::errno::Errno;
+    pub(super) use crate::intercept::{INTERCEPT_FLAG_RECORD, Interceptor};
     pub(super) use crate::recorder::RecordItems;
+    pub(super) use crate::shared_stack;
+    pub(super) use crate::stub;
+    pub(super) use crate::switch::SwitchMode;
     pub(super) use crate::tls_errno;
+    pub(super) use crate::util::cstr_from_ptr_no_libc;
+    pub(super) use crate::version;
 
     pub(super) use super::common::{
         errmsg_cstr, parse_record_names, sanitize_name_arg, stub_or_null,

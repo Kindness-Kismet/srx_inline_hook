@@ -52,13 +52,8 @@ unsafe fn hook_func_addr_2_impl(
         return ptr::null_mut();
     }
     let (record_lib_name, record_sym_name) = if flags & 8 != 0 {
-        match unsafe {
-            parse_record_names(
-                crate::intercept::INTERCEPT_FLAG_RECORD,
-                record_lib_name,
-                record_sym_name,
-            )
-        } {
+        match unsafe { parse_record_names(INTERCEPT_FLAG_RECORD, record_lib_name, record_sym_name) }
+        {
             Ok(v) => v,
             Err(e) => {
                 tls_errno::set(e);
@@ -96,13 +91,8 @@ unsafe fn hook_sym_addr_2_impl(
         return ptr::null_mut();
     }
     let (record_lib_name, record_sym_name) = if flags & 8 != 0 {
-        match unsafe {
-            parse_record_names(
-                crate::intercept::INTERCEPT_FLAG_RECORD,
-                record_lib_name,
-                record_sym_name,
-            )
-        } {
+        match unsafe { parse_record_names(INTERCEPT_FLAG_RECORD, record_lib_name, record_sym_name) }
+        {
             Ok(v) => v,
             Err(e) => {
                 tls_errno::set(e);

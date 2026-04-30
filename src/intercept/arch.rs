@@ -153,11 +153,11 @@ extern "C" fn intercept_dispatch_and_get_next_hop_arm64(
     let target_ptr = target as *mut u8;
     let ctx = unsafe { &mut *ctx };
     let flags = dispatch_with_ctx(target_ptr, ctx);
-    let head = crate::switch::head_replacement_of(target_ptr).unwrap_or(ptr::null());
+    let head = switch::head_replacement_of(target_ptr).unwrap_or(ptr::null());
     let next_hop = if has_entries(target_ptr) && !head.is_null() {
         head as *mut c_void
     } else {
-        crate::switch::trampoline_of(target_ptr)
+        switch::trampoline_of(target_ptr)
             .map(|p| p as *mut c_void)
             .unwrap_or(ptr::null_mut())
     };
@@ -354,11 +354,11 @@ extern "C" fn intercept_dispatch_and_get_next_hop_x86_64(
     saved.rcx = ctx.regs[3];
     saved.r8 = ctx.regs[4];
     saved.r9 = ctx.regs[5];
-    let head = crate::switch::head_replacement_of(target_ptr).unwrap_or(ptr::null());
+    let head = switch::head_replacement_of(target_ptr).unwrap_or(ptr::null());
     if has_entries(target_ptr) && !head.is_null() {
         return head as *mut c_void;
     }
-    crate::switch::trampoline_of(target_ptr)
+    switch::trampoline_of(target_ptr)
         .map(|p| p as *mut c_void)
         .unwrap_or(ptr::null_mut())
 }

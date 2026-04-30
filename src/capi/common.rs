@@ -4,6 +4,8 @@ use std::ffi::CString;
 
 use crate::api::HookStub;
 use crate::errno::Errno;
+use crate::intercept::INTERCEPT_FLAG_RECORD;
+use crate::util::cstr_from_ptr_no_libc;
 
 pub(super) fn sanitize_name_arg(raw: &CStr) -> Result<CString, Errno> {
     let bytes = raw.to_bytes();
@@ -77,13 +79,13 @@ pub(super) unsafe fn parse_record_names<'a>(
     record_lib_name: *const c_char,
     record_sym_name: *const c_char,
 ) -> Result<(Option<&'a CStr>, Option<&'a CStr>), Errno> {
-    if flags & crate::intercept::INTERCEPT_FLAG_RECORD == 0 {
+    if flags & INTERCEPT_FLAG_RECORD == 0 {
         return Ok((None, None));
     }
     let lib = if record_lib_name.is_null() {
         None
     } else {
-        let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(record_lib_name) }) else {
+        let Some(lib) = (unsafe { cstr_from_ptr_no_libc(record_lib_name) }) else {
             return Err(Errno::InvalidArg);
         };
         if !check_record_name_valid(lib) {
@@ -94,7 +96,7 @@ pub(super) unsafe fn parse_record_names<'a>(
     let sym = if record_sym_name.is_null() {
         None
     } else {
-        let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(record_sym_name) }) else {
+        let Some(sym) = (unsafe { cstr_from_ptr_no_libc(record_sym_name) }) else {
             return Err(Errno::InvalidArg);
         };
         if !check_record_name_valid(sym) {

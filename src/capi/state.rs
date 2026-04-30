@@ -2,7 +2,7 @@ use super::prelude::*;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn srx_inline_hook_get_version() -> *const c_char {
-    crate::version::get_version_cstr()
+    version::get_version_cstr()
 }
 
 #[unsafe(no_mangle)]

@@ -13,11 +13,11 @@ unsafe extern "C" fn srx_inline_hook_hook_sym_name_impl(
         return ptr::null_mut();
     }
     // SAFETY: lib_name / sym_name 为 NUL 终止；手扫避免被 hook libc strlen 反噬
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
@@ -56,11 +56,11 @@ unsafe extern "C" fn srx_inline_hook_hook_sym_name_callback_impl(
         return ptr::null_mut();
     }
     // SAFETY: CStr 存活期由调用方保证；手扫避免被 hook libc strlen 反噬
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
@@ -102,11 +102,11 @@ unsafe extern "C" fn srx_inline_hook_hook_sym_name_2_impl(
         return ptr::null_mut();
     }
     // SAFETY: CStr 存活期由调用方保证；手扫避免被 hook libc strlen 反噬
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
@@ -147,11 +147,11 @@ unsafe extern "C" fn srx_inline_hook_hook_sym_name_callback_2_impl(
         return ptr::null_mut();
     }
     // SAFETY: CStr 存活期由调用方保证；手扫避免被 hook libc strlen 反噬
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };

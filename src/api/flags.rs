@@ -49,7 +49,7 @@ pub(crate) fn ensure_multi_orig_addr(
 }
 
 pub fn check_intercept_flags(flags: u32) -> Result<(), Errno> {
-    if flags & !crate::intercept::INTERCEPT_FLAG_KNOWN_MASK != 0 {
+    if flags & !intercept::INTERCEPT_FLAG_KNOWN_MASK != 0 {
         return Err(Errno::InvalidArg);
     }
     Ok(())

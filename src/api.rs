@@ -15,14 +15,17 @@ mod prelude {
     pub(super) use crate::arch::current;
     pub(super) use crate::bytesig;
     pub(super) use crate::errno::Errno;
+    pub(super) use crate::intercept::{self, Interceptor};
     pub(super) use crate::linker::{self, LoadedSymbolLookup};
     pub(super) use crate::pending;
     pub(super) use crate::recorder::{self, RecordItems, RecordMeta, RecordOp};
     pub(super) use crate::runtime;
+    pub(super) use crate::shared_stack;
     pub(super) use crate::stub;
     pub(super) use crate::switch::{self, RemoveOutcome, Switch, SwitchMode};
     pub(super) use crate::tls_errno;
     pub(super) use crate::trampoline;
+    pub(super) use crate::version;
 
     pub(super) use super::flags::{
         HOOK_FLAG_MULTI, check_hook_flags, check_intercept_flags, ensure_multi_orig_addr,

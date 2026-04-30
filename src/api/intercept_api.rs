@@ -5,14 +5,14 @@ pub type InterceptedCallback = extern "C" fn(
     lib_name: *const c_char,
     sym_name: *const c_char,
     sym_addr: *const c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     arg: *mut c_void,
 );
 
 pub unsafe fn intercept_instr_addr(
     instr_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
 ) -> Result<HookStub, Errno> {
@@ -21,7 +21,7 @@ pub unsafe fn intercept_instr_addr(
 
 pub(crate) unsafe fn intercept_instr_addr_with_names(
     instr_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -36,7 +36,7 @@ pub(crate) unsafe fn intercept_instr_addr_with_names(
 
 pub(crate) unsafe fn intercept_instr_addr_with_names_and_caller_addr(
     instr_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -74,7 +74,7 @@ pub(crate) unsafe fn intercept_instr_addr_with_names_and_caller_addr(
 
 pub unsafe fn intercept_func_addr(
     func_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
 ) -> Result<HookStub, Errno> {
@@ -83,7 +83,7 @@ pub unsafe fn intercept_func_addr(
 
 pub(crate) unsafe fn intercept_func_addr_with_names(
     func_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -98,7 +98,7 @@ pub(crate) unsafe fn intercept_func_addr_with_names(
 
 pub(crate) unsafe fn intercept_func_addr_with_names_and_caller_addr(
     func_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -136,7 +136,7 @@ pub(crate) unsafe fn intercept_func_addr_with_names_and_caller_addr(
 
 pub unsafe fn intercept_sym_addr(
     sym_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
 ) -> Result<HookStub, Errno> {
@@ -145,7 +145,7 @@ pub unsafe fn intercept_sym_addr(
 
 pub(crate) unsafe fn intercept_sym_addr_with_names(
     sym_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -160,7 +160,7 @@ pub(crate) unsafe fn intercept_sym_addr_with_names(
 
 pub(crate) unsafe fn intercept_sym_addr_with_names_and_caller_addr(
     sym_addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     lib_name: Option<&CStr>,
@@ -198,13 +198,13 @@ pub(crate) unsafe fn intercept_sym_addr_with_names_and_caller_addr(
 
 pub(crate) fn intercept_addr_impl(
     addr: *mut c_void,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
 ) -> Result<HookStub, Errno> {
     let target_ptr = addr as *mut u8;
-    let launcher = crate::intercept::ensure_launcher(target_ptr)?;
-    if !crate::intercept::has_hook(target_ptr) {
+    let launcher = intercept::ensure_launcher(target_ptr)?;
+    if !intercept::has_hook(target_ptr) {
         let (hook_stub, _) = unsafe {
             hook_inline_for_pending(
                 addr,
@@ -213,15 +213,15 @@ pub(crate) fn intercept_addr_impl(
                 SwitchMode::Intercept,
             )
         }?;
-        crate::intercept::bind_hook(target_ptr, hook_stub)?;
+        intercept::bind_hook(target_ptr, hook_stub)?;
     }
-    crate::intercept::add(target_ptr, pre, data, flags)
+    intercept::add(target_ptr, pre, data, flags)
 }
 
 pub unsafe fn intercept_sym_name(
     lib_name: &CStr,
     sym_name: &CStr,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
 ) -> Result<HookStub, Errno> {
@@ -231,7 +231,7 @@ pub unsafe fn intercept_sym_name(
 pub(crate) unsafe fn intercept_sym_name_with_caller_addr(
     lib_name: &CStr,
     sym_name: &CStr,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     caller_addr: usize,
@@ -311,7 +311,7 @@ pub(crate) unsafe fn intercept_sym_name_with_caller_addr(
 pub unsafe fn intercept_sym_name_callback(
     lib_name: &CStr,
     sym_name: &CStr,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     intercepted: Option<InterceptedCallback>,
@@ -334,7 +334,7 @@ pub unsafe fn intercept_sym_name_callback(
 pub(crate) unsafe fn intercept_sym_name_callback_with_caller_addr(
     lib_name: &CStr,
     sym_name: &CStr,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     intercepted: Option<InterceptedCallback>,
@@ -431,8 +431,8 @@ pub unsafe fn unintercept_with_caller_addr(
     tls_errno::reset();
     let result = if pending::is_pending_handle(stub.handle) {
         pending::unhook(stub.handle, caller_addr)
-    } else if crate::intercept::is_intercept_handle(stub.handle) {
-        crate::intercept::unhook_handle(stub.handle)
+    } else if intercept::is_intercept_handle(stub.handle) {
+        intercept::unhook_handle(stub.handle)
     } else {
         Err(Errno::UnhookNotFound)
     };

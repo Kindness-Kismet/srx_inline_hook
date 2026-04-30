@@ -11,7 +11,11 @@ use once_cell::sync::Lazy;
 
 use crate::api::{self, HookMode, HookStub, HookedCallback, InterceptedCallback};
 use crate::errno::Errno;
-use crate::recorder::RecordMeta;
+use crate::intercept::Interceptor;
+use crate::linker;
+use crate::recorder::{self, RecordMeta, RecordOp};
+use crate::switch::SwitchMode;
+use crate::util::cstr_from_ptr_no_libc;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PendingTaskKind {
@@ -127,7 +131,7 @@ pub fn create_hook(
 pub fn create_intercept(
     lib_name: &CStr,
     sym_name: &CStr,
-    pre: crate::intercept::Interceptor,
+    pre: Interceptor,
     data: *mut c_void,
     flags: u32,
     intercepted: Option<InterceptedCallback>,
@@ -246,7 +250,7 @@ pub fn try_pending_from_info(info: *mut libc::dl_phdr_info, size: usize) {
                 }
                 let task_lib = cbytes(&task.lib_name);
                 let task_name = task_lib.to_str().ok()?;
-                crate::linker::path_name_matches(&name, task_name).then_some(*id)
+                linker::path_name_matches(&name, task_name).then_some(*id)
             })
             .collect::<Vec<_>>()
     };
@@ -264,7 +268,7 @@ pub fn reset_after_dlclose(info: &libc::dl_phdr_info) {
             .filter_map(|(id, task)| {
                 (task.is_finished
                     && task.target_addr != 0
-                    && crate::api::is_addr_in_dlinfo(task.target_addr, info))
+                    && api::is_addr_in_dlinfo(task.target_addr, info))
                 .then_some(*id)
             })
             .collect::<Vec<_>>()
@@ -295,8 +299,7 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
 
     // SAFETY: info 来自 linker dl_init pre，同步期间结构体内容稳定
     let info_ref = unsafe { &*info };
-    let Some(sym_addr) = crate::linker::find_symbol_in_dlinfo(info_ref, cbytes(&snapshot.sym_name))
-    else {
+    let Some(sym_addr) = linker::find_symbol_in_dlinfo(info_ref, cbytes(&snapshot.sym_name)) else {
         let mut g = TASKS.lock().map_err(|_| Errno::NotSupport)?;
         if let Some(task) = g.get_mut(&id) {
             task.is_finished = true;
@@ -310,9 +313,9 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
     let sym = sym_addr as *mut c_void;
 
     let mode = match snapshot.mode {
-        HookMode::Multi => crate::switch::SwitchMode::Multi,
-        HookMode::Shared => crate::switch::SwitchMode::Shared,
-        HookMode::Unique => crate::switch::SwitchMode::Unique,
+        HookMode::Multi => SwitchMode::Multi,
+        HookMode::Shared => SwitchMode::Shared,
+        HookMode::Unique => SwitchMode::Unique,
     };
     let orig_addr = snapshot.orig_addr as *mut *const c_void;
     let result = match snapshot.kind {
@@ -325,8 +328,7 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
             )
         },
         PendingTaskKind::Intercept => {
-            let pre: crate::intercept::Interceptor =
-                unsafe { core::mem::transmute(snapshot.replacement) };
+            let pre: Interceptor = unsafe { core::mem::transmute(snapshot.replacement) };
             let data = snapshot.data as *mut c_void;
             let stub = api::intercept_addr_impl(sym, pre, data, snapshot.flags)?;
             Ok((stub, 0))
@@ -341,11 +343,11 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
             task.is_corrupted = false;
             task.target_addr = sym as usize;
             task.active_stub = stub.handle as usize;
-            crate::recorder::record_with_meta(
+            recorder::record_with_meta(
                 if snapshot.kind == PendingTaskKind::Hook {
-                    crate::recorder::RecordOp::HookSymName
+                    RecordOp::HookSymName
                 } else {
-                    crate::recorder::RecordOp::InterceptSymName
+                    RecordOp::InterceptSymName
                 },
                 sym as usize,
                 snapshot.replacement,
@@ -369,11 +371,11 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
             task.is_finished = true;
             task.is_corrupted = true;
             task.target_addr = sym as usize;
-            crate::recorder::record_with_meta(
+            recorder::record_with_meta(
                 if snapshot.kind == PendingTaskKind::Hook {
-                    crate::recorder::RecordOp::HookSymName
+                    RecordOp::HookSymName
                 } else {
-                    crate::recorder::RecordOp::InterceptSymName
+                    RecordOp::InterceptSymName
                 },
                 sym as usize,
                 snapshot.replacement,
@@ -415,8 +417,7 @@ fn run_pending_callback(task: &PendingTask, error: i32, sym_addr: *const c_void)
             let Some(cb) = task.intercepted else {
                 return;
             };
-            let pre: crate::intercept::Interceptor =
-                unsafe { core::mem::transmute(task.replacement) };
+            let pre: Interceptor = unsafe { core::mem::transmute(task.replacement) };
             cb(
                 error,
                 cbytes(&task.lib_name).as_ptr(),
@@ -432,7 +433,7 @@ fn run_pending_callback(task: &PendingTask, error: i32, sym_addr: *const c_void)
 
 fn info_name(info: *mut libc::dl_phdr_info) -> Option<String> {
     // SAFETY: info 由 linker 回调同步提供；手扫避免走 libc strlen
-    unsafe { crate::util::cstr_from_ptr_no_libc((*info).dlpi_name) }
+    unsafe { cstr_from_ptr_no_libc((*info).dlpi_name) }
         .and_then(|s| s.to_str().ok())
         .map(str::to_owned)
 }

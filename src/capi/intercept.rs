@@ -52,7 +52,7 @@ unsafe fn intercept_instr_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: crate::intercept::Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
     let r = unsafe {
         api::intercept_instr_addr_with_names_and_caller_addr(
             instr_addr,
@@ -80,7 +80,7 @@ unsafe fn intercept_func_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: crate::intercept::Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
     let r = unsafe {
         api::intercept_func_addr_with_names_and_caller_addr(
             func_addr,
@@ -108,7 +108,7 @@ unsafe fn intercept_sym_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: crate::intercept::Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
     let r = unsafe {
         api::intercept_sym_addr_with_names_and_caller_addr(
             sym_addr,
@@ -368,11 +368,11 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
@@ -384,7 +384,7 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_impl(
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let pre_fn: crate::intercept::Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
     let r = unsafe {
         api::intercept_sym_name_with_caller_addr(
             lib_owned.as_c_str(),
@@ -412,11 +412,11 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_callback_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let Some(lib) = (unsafe { crate::util::cstr_from_ptr_no_libc(lib_name) }) else {
+    let Some(lib) = (unsafe { cstr_from_ptr_no_libc(lib_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let Some(sym) = (unsafe { crate::util::cstr_from_ptr_no_libc(sym_name) }) else {
+    let Some(sym) = (unsafe { cstr_from_ptr_no_libc(sym_name) }) else {
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
@@ -428,7 +428,7 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_callback_impl(
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let pre_fn: crate::intercept::Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
     let hooked_fn = if hooked.is_null() {
         None
     } else {
