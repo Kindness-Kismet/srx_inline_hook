@@ -9,7 +9,7 @@ fn main() {
     let include_dir = manifest_dir.join("include");
     let header = include_dir.join("srx_inline_hook.h");
     println!("cargo:rerun-if-changed={}", header.display());
-    println!("cargo:metadata=include={}", include_dir.display());
+    println!("cargo:include={}", include_dir.display());
     verify_header_version(&header);
 
     let target = env::var("TARGET").expect("TARGET");
