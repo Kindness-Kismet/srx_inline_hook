@@ -1,0 +1,6 @@
+/target
+/Cargo.lock
+/.claude
+/.codex
+/CLAUDE.md
+/AGENTS.md

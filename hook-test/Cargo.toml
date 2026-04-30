@@ -1,0 +1,17 @@
+[package]
+name = "hook-test"
+version = "1.0.0"
+edition = "2024"
+
+[[bin]]
+name = "hook-test"
+path = "src/main.rs"
+
+[lib]
+name = "ctor_dtor_probe"
+crate-type = ["cdylib"]
+path = "src/ctor_dtor_probe.rs"
+
+[dependencies]
+srx_inline_hook = { path = ".." }
+libc = "^0.2.186"

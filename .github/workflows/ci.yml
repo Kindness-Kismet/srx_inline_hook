@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: r29
+  ANDROID_PLATFORM: android-31
+  REMOTE_DIR: /data/local/tmp/srx_inline_hook_test
+
+jobs:
+  check:
+    name: Static checks (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-linux-android, x86_64-linux-android]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+
+      - name: Add NDK toolchain to PATH
+        run: echo "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Host library tests
+        run: cargo test --workspace --lib
+
+      - name: Android check
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang
+          CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER: ${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android31-clang
+          RUSTFLAGS: -C force-frame-pointers=yes
+        run: cargo check --workspace --target ${{ matrix.target }}
+
+  emulator-test:
+    name: Android emulator test
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android
+
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+
+      - name: Add NDK toolchain to PATH
+        run: echo "${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Build Android workspace
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER: ${{ steps.ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android31-clang
+          RUSTFLAGS: -C force-frame-pointers=yes
+        run: cargo build --workspace --target x86_64-linux-android --release
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run hook-test on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            adb shell mkdir -p ${{ env.REMOTE_DIR }}
+            adb push target/x86_64-linux-android/release/hook-test ${{ env.REMOTE_DIR }}/
+            adb push target/x86_64-linux-android/release/libctor_dtor_probe.so ${{ env.REMOTE_DIR }}/
+            adb push target/x86_64-linux-android/release/libsrx_inline_hook.so ${{ env.REMOTE_DIR }}/
+            adb shell chmod 755 ${{ env.REMOTE_DIR }}/hook-test
+            adb shell "cd ${{ env.REMOTE_DIR }} && LD_LIBRARY_PATH=. ./hook-test" 2>&1 | tee /tmp/hook-test-output.txt
+            grep -q "hook-test: ALL PASS" /tmp/hook-test-output.txt || { echo "hook-test did not report success"; exit 1; }
