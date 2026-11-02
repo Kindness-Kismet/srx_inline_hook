@@ -11,7 +11,8 @@ const ROUNDS: usize = 300;
 
 pub fn single_thread_repeated_hook() {
     let baseline_hooks = active_hook_count();
-    let baseline_used = trampoline_stats().slots_used;
+    let baseline = trampoline_stats();
+    let baseline_used = baseline.slots_used;
 
     let mut peak_pages = 0usize;
     for i in 0..ROUNDS {
@@ -62,9 +63,10 @@ pub fn single_thread_repeated_hook() {
         "repeated_hook check failed: {}, {}, {}",
         ROUNDS, final_stats.slots_used, baseline_used
     );
-    // 释放槽位有延迟复用窗口，页数峰值应保持在有限范围内
+    // 冷却窗口内每轮最多增加一个槽，按实际页容量约束增长。
+    let slots_per_page = final_stats.slots_total / final_stats.pages;
     assert!(
-        peak_pages <= 16,
+        peak_pages <= baseline.pages + ROUNDS.div_ceil(slots_per_page),
         "repeated_hook check failed: {}",
         peak_pages
     );

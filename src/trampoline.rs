@@ -8,8 +8,15 @@ use once_cell::sync::Lazy;
 use crate::android;
 use crate::errno::Errno;
 
-// 单跳板字节数：容纳 rewrite(最坏 ≈ 80B) + 绝对跳尾部(16B) 有余
+// ARM64 最坏重定位 6×28 字节，另需续接跳转与独立入口中转各 16 字节。
+#[cfg(target_arch = "aarch64")]
+pub const TRAMPOLINE_SIZE: usize = 256;
+#[cfg(not(target_arch = "aarch64"))]
 pub const TRAMPOLINE_SIZE: usize = 128;
+#[cfg(target_arch = "aarch64")]
+pub const RELOCATION_CAPACITY: usize = TRAMPOLINE_SIZE - 16;
+#[cfg(not(target_arch = "aarch64"))]
+pub const RELOCATION_CAPACITY: usize = TRAMPOLINE_SIZE;
 // 延迟复用 10s：避开其他线程仍在 trampoline 内执行的窗口
 const REUSE_DELAY_SECS: u32 = 10;
 
@@ -54,6 +61,95 @@ pub fn acquire() -> Result<NonNull<u8>, Errno> {
     try_alloc_in_page(page, now).ok_or(Errno::Oom)
 }
 
+#[cfg(target_arch = "aarch64")]
+pub fn acquire_near(target: usize) -> Result<NonNull<u8>, Errno> {
+    let range = (target.saturating_sub(1 << 27), target.saturating_add(1 << 27));
+    let now = monotonic_secs();
+    {
+        let mut pages = POOL.pages.lock().map_err(|_| Errno::NotSupport)?;
+        for page in pages.iter_mut() {
+            let start = page.base.as_ptr() as usize;
+            if start < range.0 || start + page.page_bytes > range.1 {
+                continue;
+            }
+            if let Some(slot) = try_alloc_in_page(page, now) {
+                return Ok(slot);
+            }
+        }
+    }
+    let new = new_near_page(target, range)?;
+    let mut pages = POOL.pages.lock().map_err(|_| Errno::NotSupport)?;
+    pages.push(new);
+    try_alloc_in_page(pages.last_mut().ok_or(Errno::Oom)?, now).ok_or(Errno::Oom)
+}
+
+#[cfg(target_arch = "aarch64")]
+fn new_near_page(target: usize, range: (usize, usize)) -> Result<Page, Errno> {
+    let maps = std::fs::read_to_string("/proc/self/maps").map_err(|_| Errno::Oom)?;
+    let page_bytes = android::page_size();
+    let mut previous_end = (range.0 + page_bytes - 1) & !(page_bytes - 1);
+    let mut candidates = Vec::new();
+    for line in maps.lines() {
+        let span = line.split_whitespace().next().ok_or(Errno::NotSupport)?;
+        let (start, end) = span.split_once('-').ok_or(Errno::NotSupport)?;
+        let start = usize::from_str_radix(start, 16).map_err(|_| Errno::NotSupport)?;
+        let end = usize::from_str_radix(end, 16).map_err(|_| Errno::NotSupport)?;
+        let gap_end = start.min(range.1);
+        if previous_end + page_bytes <= gap_end {
+            let candidate = (target & !(page_bytes - 1))
+                .clamp(previous_end, (gap_end - page_bytes) & !(page_bytes - 1));
+            candidates.push(candidate);
+        }
+        previous_end = previous_end.max(end);
+        if previous_end >= range.1 {
+            break;
+        }
+    }
+    if previous_end + page_bytes <= range.1 {
+        candidates.push(previous_end);
+    }
+    candidates.sort_unstable_by_key(|address| address.abs_diff(target));
+    for candidate in candidates {
+        let page = match new_page_at(candidate as *mut core::ffi::c_void) {
+            Ok(page) => page,
+            Err(Errno::Oom) => continue,
+            Err(error) => return Err(error),
+        };
+        let address = page.base.as_ptr() as usize;
+        if address >= range.0 && address + page_bytes <= range.1 {
+            return Ok(page);
+        }
+        // 地址提示可能被内核忽略，只释放本次分配的页，不覆盖现有映射。
+        unsafe { libc::munmap(page.base.as_ptr().cast(), page.page_bytes) };
+    }
+    Err(Errno::Oom)
+}
+
+pub unsafe fn prepare_entry_jump(
+    target: *mut u8,
+    replacement: *const u8,
+    trampoline: *mut u8,
+    patch: &mut [u8],
+) -> Result<(), Errno> {
+    #[cfg(target_arch = "aarch64")]
+    {
+        let relay = unsafe { trampoline.add(TRAMPOLINE_SIZE - 16) };
+        crate::arch::current::make_relative_jump(target, relay, patch)?;
+        let mut relay_bytes = [0u8; 16];
+        crate::arch::current::make_absolute_jump(replacement, &mut relay_bytes)?;
+        unsafe {
+            android::write_inst(relay, &relay_bytes);
+            android::clear_icache(relay, relay_bytes.len());
+        }
+        Ok(())
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        let _ = (target, trampoline);
+        crate::arch::current::make_absolute_jump(replacement, patch)
+    }
+}
+
 fn try_alloc_in_page(page: &mut Page, now: u32) -> Option<NonNull<u8>> {
     for i in 0..page.slot_count {
         let f = page.flags[i];
@@ -75,11 +171,15 @@ fn try_alloc_in_page(page: &mut Page, now: u32) -> Option<NonNull<u8>> {
 }
 
 fn new_page() -> Result<Page, Errno> {
+    new_page_at(core::ptr::null_mut())
+}
+
+fn new_page_at(address: *mut core::ffi::c_void) -> Result<Page, Errno> {
     let page_bytes = android::page_size();
-    // SAFETY: nullptr 由内核自选地址
+    // 地址仅作提示，内核不得覆盖现有映射。
     let raw = unsafe {
         libc::mmap(
-            core::ptr::null_mut(),
+            address,
             page_bytes,
             libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
@@ -113,7 +213,7 @@ pub fn release(addr: NonNull<u8>) -> Result<(), Errno> {
         let end = base + page.page_bytes;
         if target >= base && target < end {
             let offset = target - base;
-            if offset % TRAMPOLINE_SIZE != 0 {
+            if !offset.is_multiple_of(TRAMPOLINE_SIZE) {
                 return Err(Errno::UnhookTrampoMismatch);
             }
             let idx = offset / TRAMPOLINE_SIZE;
@@ -142,8 +242,10 @@ pub fn stats() -> TrampolineStats {
         return TrampolineStats::default();
     };
     let now = monotonic_secs();
-    let mut s = TrampolineStats::default();
-    s.pages = pages.len();
+    let mut s = TrampolineStats {
+        pages: pages.len(),
+        ..TrampolineStats::default()
+    };
     for page in pages.iter() {
         s.slots_total += page.slot_count;
         for i in 0..page.slot_count {

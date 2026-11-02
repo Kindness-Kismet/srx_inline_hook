@@ -32,5 +32,8 @@ pub fn get_mode() -> HookMode {
     }
 }
 
-// prologue 探测上限：一个最长单指令 + 预留
+#[cfg(target_arch = "aarch64")]
+pub(super) const PROLOGUE_PROBE_LEN: usize = current::RELOCATION_LEN;
+// 覆盖 x86_64 解码到改写边界所需的指令。
+#[cfg(not(target_arch = "aarch64"))]
 pub(super) const PROLOGUE_PROBE_LEN: usize = 24;

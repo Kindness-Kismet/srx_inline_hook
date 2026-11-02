@@ -263,29 +263,39 @@ pub(crate) unsafe fn hook_inline_inner(
         None => {}
     }
 
-    // 邻近函数 patch 区间相交检测：16B 窗口覆盖下一个函数 prologue 时拒绝
+    // 邻近函数入口改写区间相交时拒绝。
     if switch::has_overlap(target_ptr, current::MIN_OVERWRITE_LEN) {
         return Err(Errno::HookOverlap);
     }
 
+    let mut prologue = [0u8; PROLOGUE_PROBE_LEN];
+    unsafe {
+        bytesig::guard(|| {
+            ptr::copy_nonoverlapping(target_ptr, prologue.as_mut_ptr(), PROLOGUE_PROBE_LEN);
+        })?;
+    }
     let shared_launcher = if mode == SwitchMode::Shared {
         Some(shared_stack::create_launcher(target_ptr)?)
     } else {
         None
     };
-    let tramp_ptr = trampoline::acquire()?;
+    #[cfg(target_arch = "aarch64")]
+    let allocation = trampoline::acquire_near(target_ptr as usize);
+    #[cfg(not(target_arch = "aarch64"))]
+    let allocation = trampoline::acquire();
+    let tramp_ptr = match allocation {
+        Ok(value) => value,
+        Err(error) => {
+            if let Some(launcher) = shared_launcher {
+                let _ = trampoline::release(launcher);
+            }
+            return Err(error);
+        }
+    };
 
-    // 读 prologue + rewrite 一并纳入 guard，防 target 不可读或 rewriter 越界
-    let rewritten = match unsafe {
-        bytesig::guard(|| -> Result<current::Rewritten, Errno> {
-            let mut prologue = [0u8; PROLOGUE_PROBE_LEN];
-            // SAFETY: guard 捕获潜在 SIGSEGV；调用方保证 target 指向函数入口
-            ptr::copy_nonoverlapping(target_ptr, prologue.as_mut_ptr(), PROLOGUE_PROBE_LEN);
-            current::rewrite(&prologue, target_ptr as u64, tramp_ptr.as_ptr() as u64)
-        })
-    } {
-        Ok(Ok(r)) => r,
-        Ok(Err(e)) | Err(e) => {
+    let rewritten = match current::rewrite(&prologue, target_ptr as u64, tramp_ptr.as_ptr() as u64) {
+        Ok(value) => value,
+        Err(e) => {
             if let Some(launcher) = shared_launcher {
                 let _ = trampoline::release(launcher);
             }
@@ -295,7 +305,7 @@ pub(crate) unsafe fn hook_inline_inner(
     };
 
     if rewritten.consumed < current::MIN_OVERWRITE_LEN
-        || rewritten.bytes.len() + current::MIN_OVERWRITE_LEN > trampoline::TRAMPOLINE_SIZE
+        || rewritten.bytes.len() + current::MIN_OVERWRITE_LEN > trampoline::RELOCATION_CAPACITY
     {
         if let Some(launcher) = shared_launcher {
             let _ = trampoline::release(launcher);
@@ -342,7 +352,9 @@ pub(crate) unsafe fn hook_inline_inner(
     } else {
         replacement as *const u8
     };
-    if let Err(e) = current::make_absolute_jump(patch_target, &mut patch) {
+    if let Err(e) = unsafe {
+        trampoline::prepare_entry_jump(target_ptr, patch_target, tramp_ptr.as_ptr(), &mut patch)
+    } {
         if let Some(launcher) = shared_launcher {
             let _ = trampoline::release(launcher);
         }

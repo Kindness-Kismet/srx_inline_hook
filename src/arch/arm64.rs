@@ -3,9 +3,24 @@
 
 use crate::errno::Errno;
 
-// 绝对跳转：LDR X16,[PC+8] + RET X16 + 8 字节目标
-// RET 不受 BTI 守护；若改成 BR X16，跳转到无 BTI 标记的目标会触发 SIGILL
+// 绝对跳转：LDR X16,[PC+8] + RET X16 + 8 字节目标。
+// RET 不要求目标具备 BTI 标记。
 pub const MIN_OVERWRITE_LEN: usize = 16;
+// 备份覆盖带对齐填充的 24 字节绝对跳转；只改写 16 字节，避免覆盖邻接短函数。
+pub const RELOCATION_LEN: usize = 24;
+
+pub fn make_relative_jump(from: *const u8, to: *const u8, buf: &mut [u8]) -> Result<(), Errno> {
+    let offset = (to as usize as i128) - (from as usize as i128);
+    if buf.len() < MIN_OVERWRITE_LEN || offset % 4 != 0 || !(-(1 << 27)..(1 << 27)).contains(&offset) {
+        return Err(Errno::HookRewriteFailed);
+    }
+    let instruction = 0x1400_0000 | (((offset / 4) as u32) & 0x03ff_ffff);
+    buf[..4].copy_from_slice(&instruction.to_le_bytes());
+    for bytes in buf[4..MIN_OVERWRITE_LEN].as_chunks_mut::<4>().0 {
+        bytes.copy_from_slice(&0xd503_201fu32.to_le_bytes());
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InsnKind {
@@ -90,11 +105,11 @@ fn classify(raw: u32) -> InsnKind {
 }
 
 pub fn rewrite(bytes: &[u8], pc_src: u64, pc_dst: u64) -> Result<Rewritten, Errno> {
-    if bytes.len() < MIN_OVERWRITE_LEN {
+    if bytes.len() < RELOCATION_LEN {
         return Err(Errno::HookRewriteFailed);
     }
     // Phase 1：解码 prologue 每条指令、预算重写后长度，供 fix_addr 查表
-    let total_insns = MIN_OVERWRITE_LEN / 4;
+    let total_insns = RELOCATION_LEN / 4;
     let mut insns: Vec<Insn> = Vec::with_capacity(total_insns);
     let mut inst_lens: Vec<usize> = Vec::with_capacity(total_insns);
     for i in 0..total_insns {
@@ -401,10 +416,8 @@ pub fn make_absolute_jump(to: *const u8, buf: &mut [u8]) -> Result<(), Errno> {
     if buf.len() < MIN_OVERWRITE_LEN {
         return Err(Errno::InvalidArg);
     }
-    // LDR X16, [PC+8] = 0x58000050
     buf[0..4].copy_from_slice(&0x5800_0050u32.to_le_bytes());
-    // RET X16         = 0xD65F0200；见 RET_X16 常量的 BTI 兼容说明
-    buf[4..8].copy_from_slice(&0xD65F_0200u32.to_le_bytes());
+    buf[4..8].copy_from_slice(&RET_X16.to_le_bytes());
     buf[8..16].copy_from_slice(&(to as u64).to_le_bytes());
     Ok(())
 }

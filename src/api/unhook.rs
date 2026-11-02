@@ -224,7 +224,10 @@ unsafe fn unhook_finalize(sw: Switch) -> Result<(), Errno> {
 // MULTI 首节点被拆除且 queue 仍有残留：patch target 跳转新 head
 unsafe fn repatch_head(target_ptr: *mut u8, new_head: *const c_void) -> Result<(), Errno> {
     let mut patch = [0u8; current::MIN_OVERWRITE_LEN];
-    current::make_absolute_jump(new_head as *const u8, &mut patch)?;
+    let tramp = switch::trampoline_of(target_ptr).ok_or(Errno::UnhookNotFound)?;
+    unsafe {
+        trampoline::prepare_entry_jump(target_ptr, new_head as *const u8, tramp, &mut patch)?;
+    }
     let guarded = unsafe {
         bytesig::guard(|| -> Result<(), Errno> {
             // SAFETY: guard 捕获并发读写 SIGSEGV / SIGBUS

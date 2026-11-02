@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
     fs::write(&exports_path, exports.join("\n") + "\n").expect("write exports list");
 
     let version_script = out_dir.join("srx_inline_hook.version.map");
-    fs::write(&version_script, version_script_text(&exports)).expect("write version script");
+    fs::write(&version_script, version_script_text()).expect("write version script");
     let version_script_arg = version_script
         .to_str()
         .expect("version script utf8")
@@ -103,18 +103,12 @@ fn export_symbols(header: &PathBuf) -> Vec<String> {
     exports.into_iter().collect()
 }
 
-fn version_script_text(exports: &[String]) -> String {
-    let mut text = String::from("SRX_INLINE_HOOK {\n  global:\n");
-    for sym in exports {
-        text.push_str("    ");
-        text.push_str(sym);
-        text.push_str(";\n");
-    }
-    text.push_str("  local:\n    *;\n};\n");
-    text
+fn version_script_text() -> &'static str {
+    // Rust 自动导出表的精确规则优先；通配规则为汇编入口补充版本，不重复分配。
+    "SRX_INLINE_HOOK {\n  global:\n    srx_inline_hook_*;\n  local:\n    *;\n};\n"
 }
 
-fn verify_previous_build_exports(manifest_dir: &PathBuf, target: &str, exports: &[String]) {
+fn verify_previous_build_exports(manifest_dir: &Path, target: &str, exports: &[String]) {
     let lib_path = manifest_dir
         .join("target")
         .join(target)
