@@ -11,7 +11,10 @@ pub const RELOCATION_LEN: usize = 24;
 
 pub fn make_relative_jump(from: *const u8, to: *const u8, buf: &mut [u8]) -> Result<(), Errno> {
     let offset = (to as usize as i128) - (from as usize as i128);
-    if buf.len() < MIN_OVERWRITE_LEN || offset % 4 != 0 || !(-(1 << 27)..(1 << 27)).contains(&offset) {
+    if buf.len() < MIN_OVERWRITE_LEN
+        || offset % 4 != 0
+        || !(-(1 << 27)..(1 << 27)).contains(&offset)
+    {
         return Err(Errno::HookRewriteFailed);
     }
     let instruction = 0x1400_0000 | (((offset / 4) as u32) & 0x03ff_ffff);

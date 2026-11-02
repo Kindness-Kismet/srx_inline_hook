@@ -293,7 +293,8 @@ pub(crate) unsafe fn hook_inline_inner(
         }
     };
 
-    let rewritten = match current::rewrite(&prologue, target_ptr as u64, tramp_ptr.as_ptr() as u64) {
+    let rewritten = match current::rewrite(&prologue, target_ptr as u64, tramp_ptr.as_ptr() as u64)
+    {
         Ok(value) => value,
         Err(e) => {
             if let Some(launcher) = shared_launcher {

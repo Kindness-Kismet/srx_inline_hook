@@ -63,7 +63,10 @@ pub fn acquire() -> Result<NonNull<u8>, Errno> {
 
 #[cfg(target_arch = "aarch64")]
 pub fn acquire_near(target: usize) -> Result<NonNull<u8>, Errno> {
-    let range = (target.saturating_sub(1 << 27), target.saturating_add(1 << 27));
+    let range = (
+        target.saturating_sub(1 << 27),
+        target.saturating_add(1 << 27),
+    );
     let now = monotonic_secs();
     {
         let mut pages = POOL.pages.lock().map_err(|_| Errno::NotSupport)?;
