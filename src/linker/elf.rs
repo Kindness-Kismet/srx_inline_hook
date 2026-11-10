@@ -243,7 +243,7 @@ unsafe fn gnu_hash_lookup(
     let buckets = unsafe { bloom.add(bloom_count) } as *const u32;
     let chains = unsafe { buckets.add(nbucket) };
     let hash = gnu_hash(target.to_bytes());
-    let elfclass_bits = size_of::<usize>() * 8;
+    let elfclass_bits = usize::BITS as usize;
     // SAFETY: bloom_count > 0，bloom 指向 bloom filter 数组
     let word = unsafe { *bloom.add((hash as usize / elfclass_bits) % bloom_count) };
     let mask = (1usize << (hash as usize % elfclass_bits))
@@ -451,11 +451,11 @@ fn load_lzma_api_from(path: &CStr) -> Option<LzmaApi> {
         crc64();
     }
     Some(LzmaApi {
-        construct: unsafe { core::mem::transmute(construct) },
-        is_finished: unsafe { core::mem::transmute(is_finished) },
-        free: unsafe { core::mem::transmute(free) },
-        code: unsafe { core::mem::transmute(code) },
-        code_q: unsafe { core::mem::transmute(code) },
+        construct: unsafe { core::mem::transmute::<*mut c_void, LzmaConstruct>(construct) },
+        is_finished: unsafe { core::mem::transmute::<*mut c_void, LzmaIsFinished>(is_finished) },
+        free: unsafe { core::mem::transmute::<*mut c_void, LzmaFree>(free) },
+        code: unsafe { core::mem::transmute::<*mut c_void, LzmaCode>(code) },
+        code_q: unsafe { core::mem::transmute::<*mut c_void, LzmaCodeQ>(code) },
     })
 }
 

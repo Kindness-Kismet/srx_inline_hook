@@ -1,5 +1,13 @@
 use super::prelude::*;
 
+#[derive(Clone, Copy)]
+pub(crate) struct HookOptions<T> {
+    pub flags: u32,
+    pub callback: Option<T>,
+    pub callback_arg: *mut c_void,
+    pub caller_addr: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HookStub {
     pub(crate) handle: *mut c_void,

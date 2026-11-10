@@ -170,10 +170,12 @@ unsafe extern "C" fn srx_inline_hook_hook_sym_name_callback_2_impl(
             sym_owned.as_c_str(),
             new_addr,
             orig_addr as *mut *const c_void,
-            flags,
-            hooked,
-            hooked_arg,
-            caller_addr as usize,
+            api::HookOptions {
+                flags,
+                callback: hooked,
+                callback_arg: hooked_arg,
+                caller_addr: caller_addr as usize,
+            },
         )
     };
     stub_or_null(r)

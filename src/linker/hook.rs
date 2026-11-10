@@ -98,7 +98,7 @@ extern "C" fn linker_call_constructors_proxy(soinfo: *mut c_void) {
         dlpi_tls_data: ptr::null_mut(),
     };
     let scan_pre_ok = do_scan && scan_soinfo_pre(soinfo, &mut dlinfo).is_ok();
-    let scan_process_ok = scan_pre_ok && dlinfo.dlpi_name != ptr::null();
+    let scan_process_ok = scan_pre_ok && !dlinfo.dlpi_name.is_null();
     let steady_process_ok = !do_scan
         && SOINFO_SCAN_OK.load(Ordering::Acquire)
         && soinfo_is_loading(soinfo).unwrap_or(false)
@@ -117,7 +117,7 @@ extern "C" fn linker_call_constructors_proxy(soinfo: *mut c_void) {
     if scan_pre_ok {
         scan_soinfo_post(soinfo);
     }
-    if can_process && callbacks_registered && dlinfo.dlpi_name != ptr::null() {
+    if can_process && callbacks_registered && !dlinfo.dlpi_name.is_null() {
         dlcb::dispatch_init_post(&mut dlinfo, size_of::<libc::dl_phdr_info>());
     }
 }
@@ -268,11 +268,11 @@ fn scan_soinfo_post(soinfo: *mut c_void) {
     if off == usize::MAX {
         return;
     }
-    if let Some(v) = read_word(soinfo, off) {
-        if v != 0 {
-            SOINFO_SCAN_OK.store(true, Ordering::Release);
-            SOINFO_SCAN_ACTIVE.store(false, Ordering::Release);
-        }
+    if let Some(v) = read_word(soinfo, off)
+        && v != 0
+    {
+        SOINFO_SCAN_OK.store(true, Ordering::Release);
+        SOINFO_SCAN_ACTIVE.store(false, Ordering::Release);
     }
 }
 

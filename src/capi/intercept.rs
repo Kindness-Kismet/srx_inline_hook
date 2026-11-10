@@ -440,10 +440,12 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_callback_impl(
             sym_owned.as_c_str(),
             pre_fn,
             data,
-            flags,
-            hooked_fn,
-            hooked_arg,
-            caller_addr as usize,
+            api::HookOptions {
+                flags,
+                callback: hooked_fn,
+                callback_arg: hooked_arg,
+                caller_addr: caller_addr as usize,
+            },
         )
     };
     stub_or_null(r)

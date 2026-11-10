@@ -14,10 +14,10 @@ unsafe extern "C" fn srx_inline_hook_get_prev_func_impl(
         if matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept) {
             shared_stack::ensure_top(body.target, return_address);
         }
-    } else if let Some((_id, body)) = stub::find_by_new_addr(func as *const c_void, None) {
-        if matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept) {
-            shared_stack::ensure_top(body.target, return_address);
-        }
+    } else if let Some((_id, body)) = stub::find_by_new_addr(func as *const c_void, None)
+        && matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept)
+    {
+        shared_stack::ensure_top(body.target, return_address);
     }
     match api::prev_func_by_addr(func as *const c_void) {
         Ok(p) => p as *mut c_void,

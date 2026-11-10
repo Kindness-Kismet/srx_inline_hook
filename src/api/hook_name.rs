@@ -6,13 +6,9 @@ unsafe fn hook_sym_name_internal(
     replacement: *const c_void,
     orig_addr: *mut *const c_void,
     mode: SwitchMode,
-    flags: u32,
-    hooked: Option<HookedCallback>,
-    hooked_arg: *mut c_void,
-    caller_addr: usize,
-    record_lib_name: Option<&CStr>,
-    record_sym_name: Option<&CStr>,
+    options: HookOptions<HookedCallback>,
 ) -> (Result<HookStub, Errno>, *mut c_void) {
+    let HookOptions { flags, caller_addr, .. } = options;
     tls_errno::reset();
     // SAFETY: 参数存活性由调用方保证
     let sym = match unsafe { resolve_loaded_sym(lib_name, sym_name, replacement) } {
@@ -29,12 +25,7 @@ unsafe fn hook_sym_name_internal(
                 replacement,
                 orig_addr,
                 mode,
-                flags,
-                hooked,
-                hooked_arg,
-                caller_addr,
-                record_lib_name,
-                record_sym_name,
+                options,
             );
             let (final_errno, stub) = match &result {
                 Ok(stub) => (Errno::Pending, stub.handle as usize),
@@ -144,12 +135,12 @@ pub(crate) unsafe fn hook_sym_name_with_caller_addr(
             replacement,
             orig_addr,
             SwitchMode::Unique,
-            0,
-            None,
-            ptr::null_mut(),
-            caller_addr,
-            None,
-            None,
+            HookOptions {
+                flags: 0,
+                callback: None,
+                callback_arg: ptr::null_mut(),
+                caller_addr,
+            },
         )
     }
     .0
@@ -205,40 +196,40 @@ pub(crate) unsafe fn hook_sym_name_callback_with_caller_addr(
             replacement,
             orig_addr,
             SwitchMode::Unique,
-            0,
-            hooked,
-            hooked_arg,
-            caller_addr,
-            None,
-            None,
+            HookOptions {
+                flags: 0,
+                callback: hooked,
+                callback_arg: hooked_arg,
+                caller_addr,
+            },
         )
     };
     let is_pending_result = result
         .as_ref()
         .ok()
         .is_some_and(|stub| pending::is_pending_handle(stub.handle));
-    if !is_pending_result {
-        if let Some(cb) = hooked {
-            let err_code = match &result {
-                Ok(_) => Errno::Ok as i32,
-                Err(e) => *e as i32,
-            };
-            let sym_addr_ptr = if sym.is_null() {
-                ptr::null()
-            } else {
-                sym as *const c_void
-            };
-            let orig_ptr = orig_addr as *const c_void;
-            cb(
-                err_code,
-                lib_name.as_ptr(),
-                sym_name.as_ptr(),
-                sym_addr_ptr,
-                replacement,
-                orig_ptr,
-                hooked_arg,
-            );
-        }
+    if !is_pending_result
+        && let Some(cb) = hooked
+    {
+        let err_code = match &result {
+            Ok(_) => Errno::Ok as i32,
+            Err(e) => *e as i32,
+        };
+        let sym_addr_ptr = if sym.is_null() {
+            ptr::null()
+        } else {
+            sym as *const c_void
+        };
+        let orig_ptr = orig_addr as *const c_void;
+        cb(
+            err_code,
+            lib_name.as_ptr(),
+            sym_name.as_ptr(),
+            sym_addr_ptr,
+            replacement,
+            orig_ptr,
+            hooked_arg,
+        );
     }
     result
 }
@@ -282,12 +273,12 @@ pub(crate) unsafe fn hook_sym_name_2_with_caller_addr(
             replacement,
             orig_addr,
             mode,
-            flags,
-            None,
-            ptr::null_mut(),
-            caller_addr,
-            None,
-            None,
+            HookOptions {
+                flags,
+                callback: None,
+                callback_arg: ptr::null_mut(),
+                caller_addr,
+            },
         )
     }
     .0
@@ -308,10 +299,12 @@ pub unsafe fn hook_sym_name_callback_2(
             sym_name,
             replacement,
             orig_addr,
-            flags,
-            hooked,
-            hooked_arg,
-            0,
+            HookOptions {
+                flags,
+                callback: hooked,
+                callback_arg: hooked_arg,
+                caller_addr: 0,
+            },
         )
     }
 }
@@ -321,11 +314,9 @@ pub(crate) unsafe fn hook_sym_name_callback_2_with_caller_addr(
     sym_name: &CStr,
     replacement: *const c_void,
     orig_addr: *mut *const c_void,
-    flags: u32,
-    hooked: Option<HookedCallback>,
-    hooked_arg: *mut c_void,
-    caller_addr: usize,
+    options: HookOptions<HookedCallback>,
 ) -> Result<HookStub, Errno> {
+    let HookOptions { flags, callback: hooked, callback_arg: hooked_arg, .. } = options;
     if let Err(e) = check_hook_flags(flags) {
         tls_errno::set(e);
         return Err(e);
@@ -343,40 +334,35 @@ pub(crate) unsafe fn hook_sym_name_callback_2_with_caller_addr(
             replacement,
             orig_addr,
             mode,
-            flags,
-            hooked,
-            hooked_arg,
-            caller_addr,
-            None,
-            None,
+            options,
         )
     };
     let is_pending_result = result
         .as_ref()
         .ok()
         .is_some_and(|stub| pending::is_pending_handle(stub.handle));
-    if !is_pending_result {
-        if let Some(cb) = hooked {
-            let err_code = match &result {
-                Ok(_) => Errno::Ok as i32,
-                Err(e) => *e as i32,
-            };
-            let sym_addr_ptr = if sym.is_null() {
-                ptr::null()
-            } else {
-                sym as *const c_void
-            };
-            let orig_ptr = orig_addr as *const c_void;
-            cb(
-                err_code,
-                lib_name.as_ptr(),
-                sym_name.as_ptr(),
-                sym_addr_ptr,
-                replacement,
-                orig_ptr,
-                hooked_arg,
-            );
-        }
+    if !is_pending_result
+        && let Some(cb) = hooked
+    {
+        let err_code = match &result {
+            Ok(_) => Errno::Ok as i32,
+            Err(e) => *e as i32,
+        };
+        let sym_addr_ptr = if sym.is_null() {
+            ptr::null()
+        } else {
+            sym as *const c_void
+        };
+        let orig_ptr = orig_addr as *const c_void;
+        cb(
+            err_code,
+            lib_name.as_ptr(),
+            sym_name.as_ptr(),
+            sym_addr_ptr,
+            replacement,
+            orig_ptr,
+            hooked_arg,
+        );
     }
     result
 }

@@ -124,7 +124,7 @@ pub unsafe fn write_inst(target: *mut u8, bytes: &[u8]) -> bool {
     let len = bytes.len();
 
     #[cfg(target_arch = "aarch64")]
-    if len == 16 && addr % 16 == 0 {
+    if len == 16 && addr.is_multiple_of(16) {
         // SAFETY: 对齐 16 字节的连续 16 字节写；LDXP/STXP 在合法 AArch64 内存上定义良好
         unsafe {
             let mut lo_bytes = [0u8; 8];
@@ -137,7 +137,7 @@ pub unsafe fn write_inst(target: *mut u8, bytes: &[u8]) -> bool {
         }
         return true;
     }
-    if len == 8 && addr % 8 == 0 {
+    if len == 8 && addr.is_multiple_of(8) {
         let mut value = [0u8; 8];
         value.copy_from_slice(bytes);
         let v = u64::from_le_bytes(value);
@@ -145,7 +145,7 @@ pub unsafe fn write_inst(target: *mut u8, bytes: &[u8]) -> bool {
         unsafe { (target as *mut u64).write(v) };
         return true;
     }
-    if len == 4 && addr % 4 == 0 {
+    if len == 4 && addr.is_multiple_of(4) {
         let mut value = [0u8; 4];
         value.copy_from_slice(bytes);
         let v = u32::from_le_bytes(value);

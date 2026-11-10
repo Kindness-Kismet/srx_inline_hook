@@ -22,7 +22,7 @@ fn dl_cb(pre: *mut c_void) -> Option<DlInfoCallback> {
     if pre.is_null() {
         None
     } else {
-        Some(unsafe { core::mem::transmute(pre) })
+        Some(unsafe { core::mem::transmute::<*mut c_void, DlInfoCallback>(pre) })
     }
 }
 

@@ -1,9 +1,11 @@
 use super::prelude::*;
 
-static RESOLVED_NAME_TARGETS: Lazy<Mutex<HashMap<(Vec<u8>, Vec<u8>), usize>>> =
+type SymbolNameKey = (Vec<u8>, Vec<u8>);
+
+static RESOLVED_NAME_TARGETS: Lazy<Mutex<HashMap<SymbolNameKey, usize>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-fn resolved_name_key(lib_name: &CStr, sym_name: &CStr) -> (Vec<u8>, Vec<u8>) {
+fn resolved_name_key(lib_name: &CStr, sym_name: &CStr) -> SymbolNameKey {
     (lib_name.to_bytes().to_vec(), sym_name.to_bytes().to_vec())
 }
 

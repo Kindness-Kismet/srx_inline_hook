@@ -266,15 +266,19 @@ pub fn rewrite(bytes: &[u8], pc_src: u64, pc_dst: u64) -> Result<Rewritten, Errn
     }
 
     // Phase 2：实际重写；JMP/JCC/Call target 落在 [pc_src, pc_src + consumed) 时 fix 到 pc_dst 内
+    let context = RewriteContext {
+        pc_src,
+        pc_dst,
+        consumed,
+        infos: &infos,
+    };
     let mut out: Vec<u8> = Vec::with_capacity(new_total);
     for info in &infos {
         let raw = &bytes[info.src_off..info.src_off + info.orig_len];
         let insn = decode(raw)?;
         let src = pc_src.wrapping_add(info.src_off as u64);
         let dst = pc_dst.wrapping_add(info.new_off as u64);
-        rewrite_one(
-            raw, &insn, src, dst, pc_src, pc_dst, consumed, &infos, &mut out,
-        )?;
+        rewrite_one(raw, &insn, src, dst, &context, &mut out)?;
     }
 
     Ok(Rewritten {
@@ -295,13 +299,20 @@ fn rewritten_len(insn: &Insn) -> usize {
 
 // target 落在 prologue 内时按指令边界查表，命中→fix 到 trampoline 内；未对齐→Err
 // 对齐 arm64 sh_a64_fix_addr：仅允许跳到指令起点，跳到指令中间视为不可重写
-fn fix_target(
-    target: u64,
+struct RewriteContext<'a> {
     pc_src: u64,
     pc_dst: u64,
     consumed: usize,
-    infos: &[InsnInfo],
-) -> Result<u64, Errno> {
+    infos: &'a [InsnInfo],
+}
+
+fn fix_target(target: u64, context: &RewriteContext<'_>) -> Result<u64, Errno> {
+    let RewriteContext {
+        pc_src,
+        pc_dst,
+        consumed,
+        infos,
+    } = *context;
     let lo = pc_src;
     let hi = pc_src.wrapping_add(consumed as u64);
     if target < lo || target >= hi {
@@ -329,10 +340,7 @@ fn rewrite_one(
     insn: &Insn,
     src: u64,
     dst: u64,
-    pc_src: u64,
-    pc_dst: u64,
-    consumed: usize,
-    infos: &[InsnInfo],
+    context: &RewriteContext<'_>,
     out: &mut Vec<u8>,
 ) -> Result<(), Errno> {
     match insn.kind {
@@ -361,7 +369,7 @@ fn rewrite_one(
         }
         InsnKind::JmpRel8 | InsnKind::JmpRel32 => {
             let target = resolve_rel_target(insn, raw, src)?;
-            let target = fix_target(target, pc_src, pc_dst, consumed, infos)?;
+            let target = fix_target(target, context)?;
             let mut abs = [0u8; MIN_OVERWRITE_LEN];
             make_absolute_jump(target as *const u8, &mut abs)?;
             out.extend_from_slice(&abs);
@@ -370,7 +378,7 @@ fn rewrite_one(
         InsnKind::JccRel8 | InsnKind::JccRel32 => {
             // 反向 Jcc 跳过 14 字节绝对跳转
             let target = resolve_rel_target(insn, raw, src)?;
-            let target = fix_target(target, pc_src, pc_dst, consumed, infos)?;
+            let target = fix_target(target, context)?;
             let cc = match insn.kind {
                 InsnKind::JccRel8 => insn.opcode[0] & 0x0F,
                 InsnKind::JccRel32 => insn.opcode[1] & 0x0F,
@@ -388,7 +396,7 @@ fn rewrite_one(
             // call qword ptr [rip+2] 后接 jmp +8，跳过内嵌目标地址
             // 布局：FF 15 02 00 00 00 EB 08 <8 byte target>
             let target = resolve_rel_target(insn, raw, src)?;
-            let target = fix_target(target, pc_src, pc_dst, consumed, infos)?;
+            let target = fix_target(target, context)?;
             out.extend_from_slice(&[0xFF, 0x15, 0x02, 0x00, 0x00, 0x00, 0xEB, 0x08]);
             out.extend_from_slice(&target.to_le_bytes());
             Ok(())

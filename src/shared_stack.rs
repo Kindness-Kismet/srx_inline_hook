@@ -20,6 +20,7 @@ pub struct SharedFrame {
 }
 
 thread_local! {
+    #[expect(clippy::missing_const_for_thread_local, reason = "Android TLS 宏展开仍报告已存在的常量初始化")]
     static STACK: RefCell<Vec<SharedFrame>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -84,10 +85,10 @@ pub fn pop(return_address: *mut c_void) {
 pub fn set_allow_reentrant(return_address: *mut c_void, on: bool) {
     STACK.with(|stack| {
         let mut stack = stack.borrow_mut();
-        if let Some(frame) = stack.last_mut() {
-            if frame.return_address == return_address {
-                frame.allow_reentrant = on;
-            }
+        if let Some(frame) = stack.last_mut()
+            && frame.return_address == return_address
+        {
+            frame.allow_reentrant = on;
         }
     });
 }

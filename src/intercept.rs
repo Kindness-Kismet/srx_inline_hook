@@ -24,16 +24,10 @@ pub const INTERCEPT_FLAG_RECORD: u32 = 4;
 pub const INTERCEPT_FLAG_KNOWN_MASK: u32 =
     INTERCEPT_FLAG_FPSIMD_READ | INTERCEPT_FLAG_FPSIMD_WRITE | INTERCEPT_FLAG_RECORD;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(C)]
 pub struct SrxInlineHookVReg {
     pub d: [u64; 2],
-}
-
-impl Default for SrxInlineHookVReg {
-    fn default() -> Self {
-        Self { d: [0; 2] }
-    }
 }
 
 #[repr(C)]
@@ -117,7 +111,7 @@ pub fn add(
 
 pub fn is_intercept_handle(handle: *mut c_void) -> bool {
     let id = handle as usize;
-    id >= INTERCEPT_ID_BASE && id < (1usize << 48)
+    (INTERCEPT_ID_BASE..(1usize << 48)).contains(&id)
 }
 
 pub fn has_hook(target: *mut u8) -> bool {
@@ -151,12 +145,11 @@ pub fn discard_unused_target(target: *mut u8) {
     let removable = g.get(&(target as usize)).is_some_and(|target_entry| {
         target_entry.hook_stub.is_none() && target_entry.entries.is_empty()
     });
-    if removable {
-        if let Some(removed) = g.remove(&(target as usize)) {
-            if let Some(launcher) = NonNull::new(removed.launcher) {
-                let _ = trampoline::release(launcher);
-            }
-        }
+    if removable
+        && let Some(removed) = g.remove(&(target as usize))
+        && let Some(launcher) = NonNull::new(removed.launcher)
+    {
+        let _ = trampoline::release(launcher);
     }
 }
 

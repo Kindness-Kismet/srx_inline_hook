@@ -249,12 +249,12 @@ pub(crate) unsafe fn intercept_sym_name_with_caller_addr(
                 sym_name,
                 pre,
                 data,
-                flags,
-                None,
-                ptr::null_mut(),
-                caller_addr,
-                None,
-                None,
+                HookOptions {
+                    flags,
+                    callback: None,
+                    callback_arg: ptr::null_mut(),
+                    caller_addr,
+                },
             );
             let (final_errno, stub) = match &result {
                 Ok(stub) => (Errno::Pending, stub.handle as usize),
@@ -323,10 +323,12 @@ pub unsafe fn intercept_sym_name_callback(
             sym_name,
             pre,
             data,
-            flags,
-            intercepted,
-            intercepted_arg,
-            0,
+            HookOptions {
+                flags,
+                callback: intercepted,
+                callback_arg: intercepted_arg,
+                caller_addr: 0,
+            },
         )
     }
 }
@@ -336,11 +338,9 @@ pub(crate) unsafe fn intercept_sym_name_callback_with_caller_addr(
     sym_name: &CStr,
     pre: Interceptor,
     data: *mut c_void,
-    flags: u32,
-    intercepted: Option<InterceptedCallback>,
-    intercepted_arg: *mut c_void,
-    caller_addr: usize,
+    options: HookOptions<InterceptedCallback>,
 ) -> Result<HookStub, Errno> {
+    let HookOptions { flags, callback: intercepted, callback_arg: intercepted_arg, caller_addr } = options;
     tls_errno::reset();
     if let Err(e) = check_intercept_flags(flags) {
         tls_errno::set(e);
@@ -354,12 +354,7 @@ pub(crate) unsafe fn intercept_sym_name_callback_with_caller_addr(
                 sym_name,
                 pre,
                 data,
-                flags,
-                intercepted,
-                intercepted_arg,
-                caller_addr,
-                None,
-                None,
+                options,
             );
             let (final_errno, stub) = match &result {
                 Ok(stub) => (Errno::Pending, stub.handle as usize),

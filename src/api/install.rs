@@ -409,51 +409,25 @@ pub(crate) unsafe fn hook_inline_inner(
     }
 
     let id = stub::alloc(target_ptr, replacement, mode, orig_slot);
-    let sw = match mode {
-        SwitchMode::Unique => Switch::new_unique(
+    let sw = Switch::new(
+        mode,
+        switch::EntryPatch {
+            target: target_ptr,
+            original: original.clone(),
+            patch: patch.to_vec(),
+            consumed: rewritten.consumed,
+            tramp_addr: tramp_ptr.as_ptr(),
+        },
+        switch::ProxyNode {
             id,
-            target_ptr,
-            replacement,
-            original.clone(),
-            patch.to_vec(),
-            rewritten.consumed,
-            tramp_ptr.as_ptr(),
+            new_addr: replacement,
             orig_slot,
-        ),
-        SwitchMode::Multi => Switch::new_multi(
-            id,
-            target_ptr,
-            replacement,
-            original.clone(),
-            patch.to_vec(),
-            rewritten.consumed,
-            tramp_ptr.as_ptr(),
-            orig_slot,
-        ),
-        SwitchMode::Shared => Switch::new_shared(
-            id,
-            target_ptr,
-            replacement,
-            original.clone(),
-            patch.to_vec(),
-            rewritten.consumed,
-            tramp_ptr.as_ptr(),
-            shared_launcher
-                .as_ref()
-                .map(|p| p.as_ptr())
-                .unwrap_or(ptr::null_mut()),
-            orig_slot,
-        ),
-        SwitchMode::Intercept => Switch::new_intercept(
-            id,
-            target_ptr,
-            replacement,
-            original.clone(),
-            patch.to_vec(),
-            rewritten.consumed,
-            tramp_ptr.as_ptr(),
-        ),
-    };
+        },
+        shared_launcher
+            .as_ref()
+            .map(|p| p.as_ptr())
+            .unwrap_or(ptr::null_mut()),
+    );
     let insert_result = match mode {
         SwitchMode::Unique => switch::insert_unique(target_ptr, sw),
         SwitchMode::Multi => switch::insert_multi(target_ptr, sw),

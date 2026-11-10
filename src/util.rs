@@ -39,6 +39,6 @@ pub unsafe fn cstr_from_ptr_no_libc<'a>(ptr: *const c_char) -> Option<&'a CStr> 
     }
     // SAFETY: 上面已找到 NUL 终止，长度覆盖 ptr..=ptr+len
     Some(unsafe {
-        CStr::from_bytes_with_nul_unchecked(core::slice::from_raw_parts(ptr as *const u8, len + 1))
+        CStr::from_bytes_with_nul_unchecked(core::slice::from_raw_parts(ptr.cast::<u8>(), len + 1))
     })
 }

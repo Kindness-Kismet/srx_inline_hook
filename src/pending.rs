@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 
-use crate::api::{self, HookMode, HookStub, HookedCallback, InterceptedCallback};
+use crate::api::{self, HookMode, HookOptions, HookStub, HookedCallback, InterceptedCallback};
 use crate::errno::Errno;
 use crate::intercept::Interceptor;
 use crate::linker;
@@ -28,8 +28,6 @@ pub struct PendingTask {
     pub kind: PendingTaskKind,
     pub lib_name: Box<[u8]>,
     pub sym_name: Box<[u8]>,
-    pub record_lib_name: Option<Box<[u8]>>,
-    pub record_sym_name: Option<Box<[u8]>>,
     pub replacement: usize,
     pub orig_addr: usize,
     pub mode: HookMode,
@@ -61,14 +59,6 @@ fn cbytes(bytes: &[u8]) -> &CStr {
     unsafe { CStr::from_bytes_with_nul_unchecked(bytes) }
 }
 
-fn opt_cbytes(bytes: &Option<Box<[u8]>>) -> Option<&CStr> {
-    bytes.as_deref().map(cbytes)
-}
-
-fn own_cbytes(s: Option<&CStr>) -> Option<Box<[u8]>> {
-    s.map(|v| v.to_bytes_with_nul().into())
-}
-
 fn task_stub(id: usize, task: &PendingTask) -> HookStub {
     if task.is_finished && task.active_stub != 0 {
         HookStub {
@@ -87,12 +77,7 @@ pub fn create_hook(
     replacement: *const c_void,
     orig_addr: *mut *const c_void,
     mode: HookMode,
-    flags: u32,
-    hooked: Option<HookedCallback>,
-    hooked_arg: *mut c_void,
-    caller_addr: usize,
-    record_lib_name: Option<&CStr>,
-    record_sym_name: Option<&CStr>,
+    options: HookOptions<HookedCallback>,
 ) -> Result<HookStub, Errno> {
     if replacement.is_null() || lib_name.to_bytes().is_empty() || sym_name.to_bytes().is_empty() {
         return Err(Errno::InvalidArg);
@@ -102,18 +87,16 @@ pub fn create_hook(
         kind: PendingTaskKind::Hook,
         lib_name: lib_name.to_bytes_with_nul().into(),
         sym_name: sym_name.to_bytes_with_nul().into(),
-        record_lib_name: own_cbytes(record_lib_name),
-        record_sym_name: own_cbytes(record_sym_name),
         replacement: replacement as usize,
         orig_addr: orig_addr as usize,
         mode,
-        flags,
+        flags: options.flags,
         data: 0,
-        hooked,
-        hooked_arg: hooked_arg as usize,
+        hooked: options.callback,
+        hooked_arg: options.callback_arg as usize,
         intercepted: None,
         intercepted_arg: 0,
-        caller_addr,
+        caller_addr: options.caller_addr,
         is_finished: false,
         is_corrupted: false,
         target_addr: 0,
@@ -133,12 +116,7 @@ pub fn create_intercept(
     sym_name: &CStr,
     pre: Interceptor,
     data: *mut c_void,
-    flags: u32,
-    intercepted: Option<InterceptedCallback>,
-    intercepted_arg: *mut c_void,
-    caller_addr: usize,
-    record_lib_name: Option<&CStr>,
-    record_sym_name: Option<&CStr>,
+    options: HookOptions<InterceptedCallback>,
 ) -> Result<HookStub, Errno> {
     if lib_name.to_bytes().is_empty() || sym_name.to_bytes().is_empty() || pre as usize == 0 {
         return Err(Errno::InvalidArg);
@@ -148,18 +126,16 @@ pub fn create_intercept(
         kind: PendingTaskKind::Intercept,
         lib_name: lib_name.to_bytes_with_nul().into(),
         sym_name: sym_name.to_bytes_with_nul().into(),
-        record_lib_name: own_cbytes(record_lib_name),
-        record_sym_name: own_cbytes(record_sym_name),
         replacement: pre as usize,
         orig_addr: 0,
         mode: HookMode::Shared,
-        flags,
+        flags: options.flags,
         data: data as usize,
         hooked: None,
         hooked_arg: 0,
-        intercepted,
-        intercepted_arg: intercepted_arg as usize,
-        caller_addr,
+        intercepted: options.callback,
+        intercepted_arg: options.callback_arg as usize,
+        caller_addr: options.caller_addr,
         is_finished: false,
         is_corrupted: false,
         target_addr: 0,
@@ -354,10 +330,8 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
                 Errno::Ok,
                 Some(consumed),
                 RecordMeta {
-                    lib_name: opt_cbytes(&snapshot.record_lib_name)
-                        .or(Some(cbytes(&snapshot.lib_name))),
-                    sym_name: opt_cbytes(&snapshot.record_sym_name)
-                        .or(Some(cbytes(&snapshot.sym_name))),
+                    lib_name: Some(cbytes(&snapshot.lib_name)),
+                    sym_name: Some(cbytes(&snapshot.sym_name)),
                     caller_addr: (snapshot.caller_addr != 0).then_some(snapshot.caller_addr),
                     stub: stub.handle as usize,
                     flags: Some(snapshot.flags),
@@ -382,10 +356,8 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
                 e,
                 None,
                 RecordMeta {
-                    lib_name: opt_cbytes(&snapshot.record_lib_name)
-                        .or(Some(cbytes(&snapshot.lib_name))),
-                    sym_name: opt_cbytes(&snapshot.record_sym_name)
-                        .or(Some(cbytes(&snapshot.sym_name))),
+                    lib_name: Some(cbytes(&snapshot.lib_name)),
+                    sym_name: Some(cbytes(&snapshot.sym_name)),
                     caller_addr: (snapshot.caller_addr != 0).then_some(snapshot.caller_addr),
                     flags: Some(snapshot.flags),
                     ..RecordMeta::default()

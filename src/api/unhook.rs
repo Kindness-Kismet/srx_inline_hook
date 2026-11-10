@@ -75,10 +75,10 @@ unsafe fn unhook_inner(stub: HookStub, _caller_addr: usize) -> Result<(), Errno>
             let mut switch_entry = switch::remove(target_ptr)?;
             stub::take(id);
             if switch_entry.has_interceptors && switch_entry.intercept_carrier_id != 0 {
-                if let Some(node) = switch_entry.queue.pop() {
-                    if let Some(slot) = node.orig_slot {
-                        unsafe { ptr::write(slot, ptr::null()) };
-                    }
+                if let Some(node) = switch_entry.queue.pop()
+                    && let Some(slot) = node.orig_slot
+                {
+                    unsafe { ptr::write(slot, ptr::null()) };
                 }
                 switch_entry.mode = SwitchMode::Intercept;
                 switch::insert_existing(switch_entry)?;

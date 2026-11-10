@@ -14,6 +14,7 @@ pub struct AddrInfo {
 }
 
 // dladdr 成功返回 Some；addr 不属于任何已加载段时返回 None
+#[expect(clippy::not_unsafe_ptr_arg_deref, reason = "Bionic dladdr 只匹配地址所属模块，不解引用查询地址")]
 pub fn addr_info(addr: *const c_void) -> Option<AddrInfo> {
     // SAFETY: Dl_info 零初始化；dladdr 仅按字段写入
     let mut info: libc::Dl_info = unsafe { core::mem::zeroed() };

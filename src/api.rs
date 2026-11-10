@@ -36,7 +36,7 @@ mod prelude {
     };
     pub(super) use super::loader::{sh_dlclose, sh_dlopen, sh_dlsym_dynsym};
     pub(super) use super::resolve::{remember_resolved_symbol, resolve_loaded_sym};
-    pub(super) use super::types::{HookMode, HookStub, PROLOGUE_PROBE_LEN, get_mode};
+    pub(super) use super::types::{HookMode, HookOptions, HookStub, PROLOGUE_PROBE_LEN, get_mode};
 }
 
 mod flags;
@@ -85,6 +85,7 @@ pub use state::{
     list_hooks, set_debug, set_disabled, set_recordable, trampoline_stats,
 };
 pub use types::{HookMode, HookStub, get_mode};
+pub(crate) use types::HookOptions;
 pub(crate) use unhook::{cleanup_hooks_for_dlinfo, unhook_active};
 pub(crate) use unhook::{is_addr_in_dlinfo, unhook_with_caller_addr};
 pub use unhook::{prev_func, prev_func_by_addr, unhook};

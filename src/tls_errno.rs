@@ -6,6 +6,7 @@ use core::cell::Cell;
 use crate::errno::Errno;
 
 thread_local! {
+    #[expect(clippy::missing_const_for_thread_local, reason = "Android TLS 宏展开仍报告已存在的常量初始化")]
     static LAST: Cell<i32> = const { Cell::new(Errno::Ok as i32) };
 }
 

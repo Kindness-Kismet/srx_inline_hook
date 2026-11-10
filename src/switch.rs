@@ -25,6 +25,14 @@ pub struct ProxyNode {
     pub orig_slot: Option<*mut *const c_void>,
 }
 
+pub struct EntryPatch {
+    pub target: *mut u8,
+    pub original: Vec<u8>,
+    pub patch: Vec<u8>,
+    pub consumed: usize,
+    pub tramp_addr: *mut u8,
+}
+
 pub struct Switch {
     pub target: *mut u8,
     pub original: Vec<u8>,
@@ -43,115 +51,32 @@ pub struct Switch {
 unsafe impl Send for Switch {}
 
 impl Switch {
-    pub fn new_unique(
-        id: usize,
-        target: *mut u8,
-        replacement: *const c_void,
-        original: Vec<u8>,
-        patch: Vec<u8>,
-        consumed: usize,
-        tramp_addr: *mut u8,
-        orig_slot: Option<*mut *const c_void>,
-    ) -> Self {
-        Self {
-            target,
-            original,
-            patch,
-            consumed,
-            tramp_addr,
-            mode: SwitchMode::Unique,
-            queue: vec![ProxyNode {
-                id,
-                new_addr: replacement,
-                orig_slot,
-            }],
-            shared_orig_slot: None,
-            shared_launcher: ptr::null_mut(),
-            has_interceptors: false,
-            intercept_carrier_id: 0,
-        }
-    }
-
-    pub fn new_shared(
-        id: usize,
-        target: *mut u8,
-        replacement: *const c_void,
-        original: Vec<u8>,
-        patch: Vec<u8>,
-        consumed: usize,
-        tramp_addr: *mut u8,
+    pub fn new(
+        mode: SwitchMode,
+        entry: EntryPatch,
+        mut proxy: ProxyNode,
         shared_launcher: *mut u8,
-        orig_slot: Option<*mut *const c_void>,
     ) -> Self {
+        let (queue, shared_orig_slot, intercept_carrier_id) = match mode {
+            SwitchMode::Shared => {
+                let orig_slot = proxy.orig_slot.take();
+                (vec![proxy], orig_slot, 0)
+            }
+            SwitchMode::Intercept => (Vec::new(), None, proxy.id),
+            SwitchMode::Unique | SwitchMode::Multi => (vec![proxy], None, 0),
+        };
         Self {
-            target,
-            original,
-            patch,
-            consumed,
-            tramp_addr,
-            mode: SwitchMode::Shared,
-            queue: vec![ProxyNode {
-                id,
-                new_addr: replacement,
-                orig_slot: None,
-            }],
-            shared_orig_slot: orig_slot,
+            target: entry.target,
+            original: entry.original,
+            patch: entry.patch,
+            consumed: entry.consumed,
+            tramp_addr: entry.tramp_addr,
+            mode,
+            queue,
+            shared_orig_slot,
             shared_launcher,
             has_interceptors: false,
-            intercept_carrier_id: 0,
-        }
-    }
-
-    pub fn new_multi(
-        id: usize,
-        target: *mut u8,
-        replacement: *const c_void,
-        original: Vec<u8>,
-        patch: Vec<u8>,
-        consumed: usize,
-        tramp_addr: *mut u8,
-        orig_slot: Option<*mut *const c_void>,
-    ) -> Self {
-        Self {
-            target,
-            original,
-            patch,
-            consumed,
-            tramp_addr,
-            mode: SwitchMode::Multi,
-            queue: vec![ProxyNode {
-                id,
-                new_addr: replacement,
-                orig_slot,
-            }],
-            shared_orig_slot: None,
-            shared_launcher: ptr::null_mut(),
-            has_interceptors: false,
-            intercept_carrier_id: 0,
-        }
-    }
-
-    pub fn new_intercept(
-        id: usize,
-        target: *mut u8,
-        _replacement: *const c_void,
-        original: Vec<u8>,
-        patch: Vec<u8>,
-        consumed: usize,
-        tramp_addr: *mut u8,
-    ) -> Self {
-        Self {
-            target,
-            original,
-            patch,
-            consumed,
-            tramp_addr,
-            mode: SwitchMode::Intercept,
-            queue: Vec::new(),
-            shared_orig_slot: None,
-            shared_launcher: ptr::null_mut(),
-            has_interceptors: false,
-            intercept_carrier_id: id,
+            intercept_carrier_id,
         }
     }
 
@@ -449,7 +374,7 @@ pub fn prev_addr_by_id(id: usize) -> Option<*const c_void> {
     sw.queue
         .get(idx + 1)
         .map(|n| n.new_addr)
-        .or_else(|| Some(sw.tramp_addr as *const c_void))
+        .or(Some(sw.tramp_addr as *const c_void))
 }
 
 pub fn set_interceptors_active(target: *mut u8, on: bool) -> Result<(), Errno> {
