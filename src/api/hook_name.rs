@@ -8,7 +8,9 @@ unsafe fn hook_sym_name_internal(
     mode: SwitchMode,
     options: HookOptions<HookedCallback>,
 ) -> (Result<HookStub, Errno>, *mut c_void) {
-    let HookOptions { flags, caller_addr, .. } = options;
+    let HookOptions {
+        flags, caller_addr, ..
+    } = options;
     tls_errno::reset();
     // SAFETY: 参数存活性由调用方保证
     let sym = match unsafe { resolve_loaded_sym(lib_name, sym_name, replacement) } {
@@ -19,14 +21,8 @@ unsafe fn hook_sym_name_internal(
                 SwitchMode::Shared | SwitchMode::Intercept => HookMode::Shared,
                 SwitchMode::Multi => HookMode::Multi,
             };
-            let result = pending::create_hook(
-                lib_name,
-                sym_name,
-                replacement,
-                orig_addr,
-                mode,
-                options,
-            );
+            let result =
+                pending::create_hook(lib_name, sym_name, replacement, orig_addr, mode, options);
             let (final_errno, stub) = match &result {
                 Ok(stub) => (Errno::Pending, stub.handle as usize),
                 Err(e) => (*e, 0),
@@ -208,9 +204,7 @@ pub(crate) unsafe fn hook_sym_name_callback_with_caller_addr(
         .as_ref()
         .ok()
         .is_some_and(|stub| pending::is_pending_handle(stub.handle));
-    if !is_pending_result
-        && let Some(cb) = hooked
-    {
+    if !is_pending_result && let Some(cb) = hooked {
         let err_code = match &result {
             Ok(_) => Errno::Ok as i32,
             Err(e) => *e as i32,
@@ -316,7 +310,12 @@ pub(crate) unsafe fn hook_sym_name_callback_2_with_caller_addr(
     orig_addr: *mut *const c_void,
     options: HookOptions<HookedCallback>,
 ) -> Result<HookStub, Errno> {
-    let HookOptions { flags, callback: hooked, callback_arg: hooked_arg, .. } = options;
+    let HookOptions {
+        flags,
+        callback: hooked,
+        callback_arg: hooked_arg,
+        ..
+    } = options;
     if let Err(e) = check_hook_flags(flags) {
         tls_errno::set(e);
         return Err(e);
@@ -328,22 +327,13 @@ pub(crate) unsafe fn hook_sym_name_callback_2_with_caller_addr(
     }
     // SAFETY: 同 hook_sym_name_callback
     let (result, sym) = unsafe {
-        hook_sym_name_internal(
-            lib_name,
-            sym_name,
-            replacement,
-            orig_addr,
-            mode,
-            options,
-        )
+        hook_sym_name_internal(lib_name, sym_name, replacement, orig_addr, mode, options)
     };
     let is_pending_result = result
         .as_ref()
         .ok()
         .is_some_and(|stub| pending::is_pending_handle(stub.handle));
-    if !is_pending_result
-        && let Some(cb) = hooked
-    {
+    if !is_pending_result && let Some(cb) = hooked {
         let err_code = match &result {
             Ok(_) => Errno::Ok as i32,
             Err(e) => *e as i32,

@@ -340,7 +340,12 @@ pub(crate) unsafe fn intercept_sym_name_callback_with_caller_addr(
     data: *mut c_void,
     options: HookOptions<InterceptedCallback>,
 ) -> Result<HookStub, Errno> {
-    let HookOptions { flags, callback: intercepted, callback_arg: intercepted_arg, caller_addr } = options;
+    let HookOptions {
+        flags,
+        callback: intercepted,
+        callback_arg: intercepted_arg,
+        caller_addr,
+    } = options;
     tls_errno::reset();
     if let Err(e) = check_intercept_flags(flags) {
         tls_errno::set(e);
@@ -349,13 +354,7 @@ pub(crate) unsafe fn intercept_sym_name_callback_with_caller_addr(
     let sym_addr = match unsafe { resolve_loaded_sym(lib_name, sym_name, pre as *const c_void) } {
         Ok(sym) => Some(sym),
         Err(Errno::Pending) => {
-            let result = pending::create_intercept(
-                lib_name,
-                sym_name,
-                pre,
-                data,
-                options,
-            );
+            let result = pending::create_intercept(lib_name, sym_name, pre, data, options);
             let (final_errno, stub) = match &result {
                 Ok(stub) => (Errno::Pending, stub.handle as usize),
                 Err(e) => (*e, 0),

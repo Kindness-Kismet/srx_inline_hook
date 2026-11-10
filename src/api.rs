@@ -84,8 +84,8 @@ pub use state::{
     dump_records_with_items, get_errno, get_init_errno, init, is_debug, is_disabled, is_recordable,
     list_hooks, set_debug, set_disabled, set_recordable, trampoline_stats,
 };
-pub use types::{HookMode, HookStub, get_mode};
 pub(crate) use types::HookOptions;
+pub use types::{HookMode, HookStub, get_mode};
 pub(crate) use unhook::{cleanup_hooks_for_dlinfo, unhook_active};
 pub(crate) use unhook::{is_addr_in_dlinfo, unhook_with_caller_addr};
 pub use unhook::{prev_func, prev_func_by_addr, unhook};
