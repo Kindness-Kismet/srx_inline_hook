@@ -7,7 +7,7 @@ pub fn init(mode: HookMode, debuggable: bool) -> Result<(), Errno> {
     let r = runtime::init();
     match &r {
         Ok(()) => {
-            sh_always!(target: "srx_inline_hook", "init ok {}", version::get_version())
+            log::info!(target: "srx_inline_hook", "init ok {}", version::get_version())
         }
         Err(e) => sh_always!(
             target: "srx_inline_hook",
