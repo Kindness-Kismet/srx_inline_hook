@@ -93,6 +93,10 @@ unsafe fn install(api: &SignalApi, signum: c_int, state: &SignalState) -> Result
     action.sa_flags = libc::SA_SIGINFO
         | libc::SA_ONSTACK
         | (previous.sa_flags & (libc::SA_RESTART | SA_EXPOSE_TAGBITS));
+    // 忽略信号不应中断可重启的阻塞调用。
+    if previous.sa_sigaction == libc::SIG_IGN {
+        action.sa_flags |= libc::SA_RESTART;
+    }
     action.sa_sigaction = handler as *const () as libc::sighandler_t;
     // 先发布安装窗口的前任，随后发布替换操作返回的准确前任；两份都保持只读。
     state
