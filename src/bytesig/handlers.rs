@@ -90,16 +90,21 @@ unsafe fn install(api: &SignalApi, signum: c_int, state: &SignalState) -> Result
     let mut action: libc::sigaction = core::mem::zeroed();
     libc::sigfillset(&mut action.sa_mask);
     const SA_EXPOSE_TAGBITS: c_int = 0x800;
-    action.sa_flags = libc::SA_SIGINFO | libc::SA_ONSTACK
+    action.sa_flags = libc::SA_SIGINFO
+        | libc::SA_ONSTACK
         | (previous.sa_flags & (libc::SA_RESTART | SA_EXPOSE_TAGBITS));
     action.sa_sigaction = handler as *const () as libc::sighandler_t;
     // 先发布安装窗口的前任，随后发布替换操作返回的准确前任；两份都保持只读。
-    state.previous.store(Box::into_raw(previous), Ordering::Release);
+    state
+        .previous
+        .store(Box::into_raw(previous), Ordering::Release);
     let mut replaced = Box::new(core::mem::zeroed::<libc::sigaction>());
     if (api.register)(signum, &action, &mut *replaced) != 0 {
         return Err(());
     }
-    state.previous.store(Box::into_raw(replaced), Ordering::Release);
+    state
+        .previous
+        .store(Box::into_raw(replaced), Ordering::Release);
     state.is_installed.store(true, Ordering::Release);
     Ok(())
 }
@@ -121,9 +126,7 @@ unsafe extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, context:
     if previous.sa_sigaction == libc::SIG_IGN {
         return;
     }
-    if previous.sa_flags & libc::SA_RESETHAND != 0
-        && state.has_reset.swap(true, Ordering::AcqRel)
-    {
+    if previous.sa_flags & libc::SA_RESETHAND != 0 && state.has_reset.swap(true, Ordering::AcqRel) {
         terminate(api, signum);
     }
     forward(api, previous, signum, info, context);

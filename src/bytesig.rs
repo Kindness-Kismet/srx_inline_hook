@@ -101,7 +101,11 @@ where
 }
 
 fn occupy_slot(tid: i32) -> Result<(usize, bool), Errno> {
-    if let Some(index) = SLOTS.tids.iter().position(|slot| slot.load(Ordering::Acquire) == tid) {
+    if let Some(index) = SLOTS
+        .tids
+        .iter()
+        .position(|slot| slot.load(Ordering::Acquire) == tid)
+    {
         return Ok((index, false));
     }
     for i in 0..MAX_PROTECTED_THREADS {
