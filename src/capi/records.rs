@@ -1,3 +1,5 @@
+use std::process;
+
 use super::prelude::*;
 
 unsafe extern "C" fn srx_inline_hook_get_prev_func_impl(
@@ -8,7 +10,7 @@ unsafe extern "C" fn srx_inline_hook_get_prev_func_impl(
         return ptr::null_mut();
     }
     if !shared_stack::has_frame() {
-        std::process::abort();
+        process::abort();
     }
     if let Ok(body) = stub::get(func as usize).ok_or(Errno::UnhookNotFound) {
         if matches!(body.mode, SwitchMode::Shared | SwitchMode::Intercept) {
@@ -90,7 +92,7 @@ pub extern "C" fn srx_inline_hook_get_records(item_flags: u32) -> *mut c_char {
     }
     // SAFETY: buf 刚分配 size 字节，拷入 bytes 与末尾 NUL
     unsafe {
-        core::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, bytes.len());
+        ptr::copy_nonoverlapping(bytes.as_ptr(), buf, bytes.len());
         *buf.add(bytes.len()) = 0;
     }
     buf as *mut c_char

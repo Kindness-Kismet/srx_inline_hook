@@ -1,7 +1,8 @@
 // pending hook：目标 so 未加载时返回 Pending，后续 dlopen 命中自动安装
 // 用 libctor_dtor_probe.so 验证 ctor pre 补装，覆盖 orig_slot / callback / unhook
 
-use core::ffi::{c_int, c_void};
+use core::ffi::{c_char, c_int, c_void};
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, Ordering};
 
@@ -24,15 +25,15 @@ extern "C" fn replacement_add(a: c_int, b: c_int) -> c_int {
         return -1;
     }
     // SAFETY: pending 安装完成后 orig 槽写入 trampoline
-    let orig: AddFn = unsafe { core::mem::transmute(p) };
+    let orig: AddFn = unsafe { mem::transmute(p) };
     // SAFETY: ABI 与导出函数一致
     unsafe { orig(a, b) + 1000 }
 }
 
 extern "C" fn pending_hooked_cb(
     error: c_int,
-    _lib: *const core::ffi::c_char,
-    _sym: *const core::ffi::c_char,
+    _lib: *const c_char,
+    _sym: *const c_char,
     sym_addr: *const c_void,
     _new: *const c_void,
     _orig: *const c_void,
@@ -76,7 +77,7 @@ pub fn pending_sym_name_basic() {
     );
 
     // SAFETY: add_ptr 来自 dlsym
-    let add_fn: AddFn = unsafe { core::mem::transmute(add_ptr) };
+    let add_fn: AddFn = unsafe { mem::transmute(add_ptr) };
     // SAFETY: hook 已在 dlopen 期间装好
     let hooked = unsafe { add_fn(3, 4) };
     assert_eq!(hooked, 1007, "pending_sym_name check failed");
@@ -131,7 +132,7 @@ pub fn pending_sym_name_basic() {
         "pending_sym_name check failed"
     );
 
-    let mul_fn: AddFn = unsafe { core::mem::transmute(mul_ptr) };
+    let mul_fn: AddFn = unsafe { mem::transmute(mul_ptr) };
     let hooked_mul = unsafe { mul_fn(3, 4) };
     assert_eq!(hooked_mul, 1012, "pending_sym_name check failed");
 
@@ -160,7 +161,7 @@ pub fn pending_sym_name_basic() {
         ORIG_ADD.load(Ordering::SeqCst).is_null(),
         "pending_sym_name check failed"
     );
-    let add_fn3: AddFn = unsafe { core::mem::transmute(add_ptr3) };
+    let add_fn3: AddFn = unsafe { mem::transmute(add_ptr3) };
     let plain = unsafe { add_fn3(6, 7) };
     assert_eq!(plain, 13, "pending_sym_name check failed");
     let cancel = unsafe { unhook(wrong_path_stub) };

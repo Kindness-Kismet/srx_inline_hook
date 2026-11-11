@@ -1,3 +1,5 @@
+use core::ffi::CStr;
+
 use super::*;
 
 pub(super) fn run() {
@@ -7,8 +9,8 @@ pub(super) fn run() {
         srx_inline_hook_intercept_sym_name(
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -24,7 +26,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_instr_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             c"bad lib.so".as_ptr(),
             c"named_instr".as_ptr(),
@@ -43,7 +45,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_instr_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             c"named-lib.so".as_ptr(),
             c"bad sym".as_ptr(),
@@ -62,7 +64,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_instr_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -94,7 +96,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_instr_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             c"named-instr-lib.so".as_ptr(),
             c"named_intercept_instr".as_ptr(),
@@ -106,7 +108,7 @@ pub(super) fn run() {
     );
     let rec_named_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!rec_named_ptr.is_null(), "intercept_addr check failed");
-    let rec_named = unsafe { core::ffi::CStr::from_ptr(rec_named_ptr) }
+    let rec_named = unsafe { CStr::from_ptr(rec_named_ptr) }
         .to_str()
         .expect("intercept_instr_addr records utf8");
     assert!(
@@ -157,7 +159,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_func_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -174,7 +176,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_func_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -203,7 +205,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_func_addr(
             capi_intercept_target as *mut c_void,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             c"named-func-lib.so".as_ptr(),
             c"named_intercept_target".as_ptr(),
@@ -215,7 +217,7 @@ pub(super) fn run() {
     );
     let rec_named_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!rec_named_ptr.is_null(), "intercept_addr check failed");
-    let rec_named = unsafe { core::ffi::CStr::from_ptr(rec_named_ptr) }
+    let rec_named = unsafe { CStr::from_ptr(rec_named_ptr) }
         .to_str()
         .expect("intercept_func_addr records utf8");
     assert!(
@@ -261,7 +263,7 @@ pub(super) fn run() {
         srx_inline_hook_set_recordable(false);
     }
 
-    let mut hook_orig = core::ptr::null_mut();
+    let mut hook_orig = ptr::null_mut();
     let hook_func_stub = unsafe {
         srx_inline_hook_hook_func_addr(
             capi_intercept_target as *mut c_void,
@@ -277,13 +279,13 @@ pub(super) fn run() {
     );
     assert!(!hook_orig.is_null(), "intercept_addr check failed");
     let target_fn: extern "C" fn(i64, i64) -> i64 =
-        unsafe { core::mem::transmute(capi_intercept_target as *const c_void) };
+        unsafe { mem::transmute(capi_intercept_target as *const c_void) };
     assert_eq!(target_fn(3, 4), 707, "intercept_addr check failed");
     let hook_func_dup = unsafe {
         srx_inline_hook_hook_func_addr(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(hook_func_dup.is_null(), "intercept_addr check failed");
@@ -306,7 +308,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_sym_addr(
             capi_intercept_target as *mut c_void,
             capi_hook_sym_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(!hook_sym_stub.is_null(), "intercept_addr check failed");
@@ -320,7 +322,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_sym_addr(
             capi_intercept_target as *mut c_void,
             capi_hook_sym_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(hook_sym_dup.is_null(), "intercept_addr check failed");
@@ -342,7 +344,7 @@ pub(super) fn run() {
     assert!(!strlen_handle.is_null(), "intercept_addr check failed");
     let strlen_ptr = unsafe { libc::dlsym(strlen_handle, c"strlen".as_ptr()) };
     assert!(!strlen_ptr.is_null(), "intercept_addr check failed");
-    let mut strlen_info: libc::Dl_info = unsafe { core::mem::zeroed() };
+    let mut strlen_info: libc::Dl_info = unsafe { mem::zeroed() };
     assert_ne!(
         unsafe { libc::dladdr(strlen_ptr, &mut strlen_info) },
         0,
@@ -357,7 +359,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0x100,
         )
     };
@@ -375,7 +377,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -392,7 +394,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -424,7 +426,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             1 | 4,
             c"named-lib.so".as_ptr(),
             c"named_strlen".as_ptr(),
@@ -441,7 +443,7 @@ pub(super) fn run() {
     );
     let rec_named_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!rec_named_ptr.is_null(), "intercept_addr check failed");
-    let rec_named = unsafe { core::ffi::CStr::from_ptr(rec_named_ptr) }
+    let rec_named = unsafe { CStr::from_ptr(rec_named_ptr) }
         .to_str()
         .expect("records named utf8");
     assert!(

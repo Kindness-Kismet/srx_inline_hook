@@ -2,6 +2,8 @@
 // 每个 scenario 模块按需取用，避免 main.rs 巨型
 
 use core::ffi::c_void;
+use core::mem;
+use std::hint;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -16,13 +18,13 @@ pub static STUB_MUL: Mutex<Option<HookStub>> = Mutex::new(None);
 #[unsafe(no_mangle)]
 #[inline(never)]
 pub extern "C" fn target_add(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 #[unsafe(no_mangle)]
 #[inline(never)]
 pub extern "C" fn target_mul(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_mul(std::hint::black_box(b))
+    hint::black_box(a).wrapping_mul(hint::black_box(b))
 }
 
 pub extern "C" fn replacement_add(a: i64, b: i64) -> i64 {
@@ -36,7 +38,7 @@ pub extern "C" fn replacement_add(a: i64, b: i64) -> i64 {
         return a.wrapping_add(b);
     };
     // SAFETY: 跳板 ABI 与原函数一致
-    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(prev) };
+    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(prev) };
     prev_fn(a, b).wrapping_add(1000)
 }
 
@@ -46,7 +48,7 @@ pub extern "C" fn replacement_mul(a: i64, b: i64) -> i64 {
     // SAFETY: 同 replacement_add
     let prev = unsafe { prev_func(stub).expect("prev mul") };
     // SAFETY: 同 replacement_add
-    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(prev) };
+    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(prev) };
     prev_fn(a, b).wrapping_add(2)
 }
 

@@ -2,6 +2,7 @@
 // 串行执行规避安装/卸载窗口，交替覆盖 func_addr 与 sym_addr 记录路径
 
 use core::ffi::c_void;
+use core::ptr;
 
 use srx_inline_hook::{HookStub, active_hook_count, hook_single, hook_sym_addr, trampoline_stats};
 
@@ -27,7 +28,7 @@ pub fn single_thread_repeated_hook() {
                 hook_sym_addr(
                     target_add as *mut c_void,
                     replacement_add as *const c_void,
-                    core::ptr::null_mut(),
+                    ptr::null_mut(),
                 )
             }
             .expect("hook_sym_addr")

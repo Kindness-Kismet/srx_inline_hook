@@ -1,3 +1,5 @@
+use core::fmt;
+
 use super::prelude::*;
 
 pub fn init(mode: HookMode, debuggable: bool) -> Result<(), Errno> {
@@ -113,8 +115,8 @@ pub struct DiagnoseReport {
     pub record_error: bool,
 }
 
-impl core::fmt::Display for DiagnoseReport {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Display for DiagnoseReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{} mode={:?} init={} tls={} disabled={} debug={} recordable={} \

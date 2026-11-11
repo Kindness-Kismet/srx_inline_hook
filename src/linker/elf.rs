@@ -1,3 +1,6 @@
+use core::cmp::Ordering as CmpOrdering;
+use core::mem;
+
 use super::prelude::*;
 
 const DT_NULL: i64 = 0;
@@ -148,10 +151,10 @@ pub(super) unsafe fn dynsym_lookup(
     dyn_ptr: *const Elf64Dyn,
     target: &CStr,
 ) -> Option<usize> {
-    let mut sym_tab: *const Elf64Sym = core::ptr::null();
-    let mut str_tab: *const c_char = core::ptr::null();
-    let mut sysv_hash_ptr: *const u32 = core::ptr::null();
-    let mut gnu_hash_ptr: *const u32 = core::ptr::null();
+    let mut sym_tab: *const Elf64Sym = ptr::null();
+    let mut str_tab: *const c_char = ptr::null();
+    let mut sysv_hash_ptr: *const u32 = ptr::null();
+    let mut gnu_hash_ptr: *const u32 = ptr::null();
 
     let mut d = dyn_ptr;
     loop {
@@ -445,18 +448,18 @@ fn load_lzma_api_from(path: &CStr) -> Option<LzmaApi> {
         unsafe { libc::dlclose(handle) };
         return None;
     }
-    let crc: LzmaCrcGenerateTable = unsafe { core::mem::transmute(crc) };
+    let crc: LzmaCrcGenerateTable = unsafe { mem::transmute(crc) };
     crc();
     if !crc64.is_null() {
-        let crc64: LzmaCrc64GenerateTable = unsafe { core::mem::transmute(crc64) };
+        let crc64: LzmaCrc64GenerateTable = unsafe { mem::transmute(crc64) };
         crc64();
     }
     Some(LzmaApi {
-        construct: unsafe { core::mem::transmute::<*mut c_void, LzmaConstruct>(construct) },
-        is_finished: unsafe { core::mem::transmute::<*mut c_void, LzmaIsFinished>(is_finished) },
-        free: unsafe { core::mem::transmute::<*mut c_void, LzmaFree>(free) },
-        code: unsafe { core::mem::transmute::<*mut c_void, LzmaCode>(code) },
-        code_q: unsafe { core::mem::transmute::<*mut c_void, LzmaCodeQ>(code) },
+        construct: unsafe { mem::transmute::<*mut c_void, LzmaConstruct>(construct) },
+        is_finished: unsafe { mem::transmute::<*mut c_void, LzmaIsFinished>(is_finished) },
+        free: unsafe { mem::transmute::<*mut c_void, LzmaFree>(free) },
+        code: unsafe { mem::transmute::<*mut c_void, LzmaCode>(code) },
+        code_q: unsafe { mem::transmute::<*mut c_void, LzmaCodeQ>(code) },
     })
 }
 
@@ -546,9 +549,9 @@ fn symtab_symbol_matches(strtab: &[u8], sym: &Elf64Sym, target: &[u8]) -> bool {
         return false;
     };
     match name.len().cmp(&target.len()) {
-        core::cmp::Ordering::Less => false,
-        core::cmp::Ordering::Equal => name == target,
-        core::cmp::Ordering::Greater => {
+        CmpOrdering::Less => false,
+        CmpOrdering::Equal => name == target,
+        CmpOrdering::Greater => {
             name.starts_with(target) && matches!(name[target.len()], b'.' | b'$')
         }
     }

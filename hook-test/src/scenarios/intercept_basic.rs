@@ -1,8 +1,11 @@
 // intercept 最小链：按函数地址注册 pre 回调，调用目标时应命中，unintercept 后停止命中
 
+use core::arch::global_asm;
 use core::ffi::c_void;
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::hint;
 
 use srx_inline_hook::{hook_with_orig, unhook};
 
@@ -44,11 +47,11 @@ static HOOK_ORIG: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn intercept_target(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 #[cfg(target_arch = "x86_64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl intercept_instr_target",
     ".type intercept_instr_target, @function",
     "intercept_instr_target:",
@@ -76,7 +79,7 @@ core::arch::global_asm!(
 );
 
 #[cfg(target_arch = "aarch64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl intercept_instr_target",
     ".type intercept_instr_target, %function",
     "intercept_instr_target:",
@@ -106,7 +109,7 @@ extern "C" fn pre_cb(_ctx: *mut c_void, _data: *mut c_void) {
 extern "C" fn hook_cb(a: i64, b: i64) -> i64 {
     let orig = HOOK_ORIG.load(Ordering::SeqCst);
     assert!(!orig.is_null(), "intercept_basic check failed");
-    let prev: AddFn = unsafe { core::mem::transmute(orig) };
+    let prev: AddFn = unsafe { mem::transmute(orig) };
     prev(a, b) + 700
 }
 
@@ -138,7 +141,7 @@ pub fn intercept_func_addr_basic() {
         srx_inline_hook_intercept_func_addr(
             intercept_target as *mut c_void,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -153,7 +156,7 @@ pub fn intercept_func_addr_basic() {
         srx_inline_hook_intercept_func_addr(
             intercept_target as *mut c_void,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -165,7 +168,7 @@ pub fn intercept_func_addr_basic() {
     );
 
     let target: extern "C" fn(i64, i64) -> i64 =
-        unsafe { core::mem::transmute(intercept_target as *const c_void) };
+        unsafe { mem::transmute(intercept_target as *const c_void) };
     assert_eq!(target(3, 4), 7, "intercept_basic check failed");
     assert_eq!(
         PRE_HITS.load(Ordering::SeqCst),
@@ -223,7 +226,7 @@ pub fn intercept_func_addr_basic() {
             srx_inline_hook_intercept_instr_addr(
                 instr_addr,
                 instr_pre as *mut c_void,
-                core::ptr::null_mut(),
+                ptr::null_mut(),
                 0,
             )
         };
@@ -254,7 +257,7 @@ pub fn intercept_func_addr_basic() {
             srx_inline_hook_intercept_instr_addr(
                 instr_addr,
                 instr_pre as *mut c_void,
-                core::ptr::null_mut(),
+                ptr::null_mut(),
                 0,
             )
         };

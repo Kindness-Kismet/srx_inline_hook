@@ -1,31 +1,34 @@
 // MULTI 模式链式调用：2+ proxy 叠加，验证 orig_slot 自动 rewire 与 unhook 拆链逻辑
 
 use core::ffi::c_void;
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicPtr, Ordering};
+use std::hint;
 
 use srx_inline_hook::{hook_multi, unhook};
 
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn multi_target(x: i64) -> i64 {
-    std::hint::black_box(x) + 100
+    hint::black_box(x) + 100
 }
 
-static ORIG_A: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static ORIG_B: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static ORIG_A: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static ORIG_B: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
 // 链的下一环：单 proxy 时是 tramp→原函数；双 proxy 时 rewire 后指向 proxy_b
 extern "C" fn proxy_a(x: i64) -> i64 {
     let next = ORIG_A.load(Ordering::Acquire);
     // SAFETY: next 由 hook_multi / push_multi 写入，ABI 与 target 一致
-    let f: extern "C" fn(i64) -> i64 = unsafe { core::mem::transmute(next) };
+    let f: extern "C" fn(i64) -> i64 = unsafe { mem::transmute(next) };
     f(x) + 10
 }
 
 extern "C" fn proxy_b(x: i64) -> i64 {
     let next = ORIG_B.load(Ordering::Acquire);
     // SAFETY: 同 proxy_a
-    let f: extern "C" fn(i64) -> i64 = unsafe { core::mem::transmute(next) };
+    let f: extern "C" fn(i64) -> i64 = unsafe { mem::transmute(next) };
     f(x) * 2
 }
 

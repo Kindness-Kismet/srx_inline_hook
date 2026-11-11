@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -146,7 +147,7 @@ fn find_ndk_from_android_sdk() -> Option<PathBuf> {
         .filter_map(|key| env::var(key).ok())
         .map(|raw| normalize_host_path(&raw))
         .find(|path| path.exists())?;
-    std::fs::read_dir(sdk.join("ndk"))
+    fs::read_dir(sdk.join("ndk"))
         .ok()?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| path.is_dir())

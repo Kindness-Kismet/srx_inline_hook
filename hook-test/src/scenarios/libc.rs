@@ -1,6 +1,9 @@
 // 真机 libc hook 场景：bionic strlen；触发 arm64 ADRP / x86_64 RIP 相对 rewriter 路径
 
+use core::ffi::c_char;
 use core::ffi::c_void;
+use core::mem;
+use core::ptr;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -10,9 +13,9 @@ static STUB_STRLEN: Mutex<Option<HookStub>> = Mutex::new(None);
 static HITS_STRLEN: AtomicUsize = AtomicUsize::new(0);
 const STRLEN_BONUS: usize = 1000;
 
-type StrlenFn = unsafe extern "C" fn(*const core::ffi::c_char) -> usize;
+type StrlenFn = unsafe extern "C" fn(*const c_char) -> usize;
 
-extern "C" fn replacement_strlen(s: *const core::ffi::c_char) -> usize {
+extern "C" fn replacement_strlen(s: *const c_char) -> usize {
     HITS_STRLEN.fetch_add(1, Ordering::SeqCst);
     let stub = STUB_STRLEN
         .lock()
@@ -21,7 +24,7 @@ extern "C" fn replacement_strlen(s: *const core::ffi::c_char) -> usize {
     // SAFETY: hook 生效期间 prev_func 返回有效跳板
     let prev = unsafe { prev_func(stub).expect("prev strlen") };
     // SAFETY: 跳板 ABI 与 strlen 一致
-    let prev_fn: StrlenFn = unsafe { core::mem::transmute(prev) };
+    let prev_fn: StrlenFn = unsafe { mem::transmute(prev) };
     // SAFETY: s 由调用方保证 NUL 终止
     let real = unsafe { prev_fn(s) };
     real + STRLEN_BONUS
@@ -47,7 +50,7 @@ pub fn hook_libc_strlen() {
     let mut buf = [0u8; 24];
     // SAFETY: strlen_ptr 指向可读可执行页
     unsafe {
-        core::ptr::copy_nonoverlapping(strlen_ptr as *const u8, buf.as_mut_ptr(), 24);
+        ptr::copy_nonoverlapping(strlen_ptr as *const u8, buf.as_mut_ptr(), 24);
     }
     let mut hex = String::new();
     for w in buf.chunks_exact(4) {
@@ -63,7 +66,7 @@ pub fn hook_libc_strlen() {
     let probe = c"hook-me!";
     // SAFETY: probe 为 'static NUL 终止字符串
     let before = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(probe.as_ptr())
     };
     assert_eq!(before, 8);
@@ -82,7 +85,7 @@ pub fn hook_libc_strlen() {
 
     // SAFETY: 同 before
     let hooked = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(probe.as_ptr())
     };
     assert_eq!(hooked, 8 + STRLEN_BONUS);
@@ -94,7 +97,7 @@ pub fn hook_libc_strlen() {
 
     // SAFETY: 同 before
     let restored = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(probe.as_ptr())
     };
     assert_eq!(restored, 8);

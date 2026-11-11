@@ -2,6 +2,8 @@
 // 与 intercept_func_addr 的差异只在 API 入口与记录标签
 
 use core::ffi::{c_char, c_int, c_void};
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 unsafe extern "C" {
@@ -42,13 +44,13 @@ pub fn intercept_sym_addr_basic() {
         println!("intercept_sym_addr_basic: skipped");
         return;
     }
-    let strlen_fn: StrlenFn = unsafe { core::mem::transmute(strlen_ptr) };
+    let strlen_fn: StrlenFn = unsafe { mem::transmute(strlen_ptr) };
 
     let bad_flags = unsafe {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0x100,
         )
     };
@@ -60,12 +62,7 @@ pub fn intercept_sym_addr_basic() {
     );
 
     let stub = unsafe {
-        srx_inline_hook_intercept_sym_addr(
-            strlen_ptr,
-            pre_cb as *mut c_void,
-            core::ptr::null_mut(),
-            0,
-        )
+        srx_inline_hook_intercept_sym_addr(strlen_ptr, pre_cb as *mut c_void, ptr::null_mut(), 0)
     };
     assert!(!stub.is_null(), "intercept_sym_addr check failed");
     assert_eq!(
@@ -75,12 +72,7 @@ pub fn intercept_sym_addr_basic() {
     );
 
     let dup = unsafe {
-        srx_inline_hook_intercept_sym_addr(
-            strlen_ptr,
-            pre_cb as *mut c_void,
-            core::ptr::null_mut(),
-            0,
-        )
+        srx_inline_hook_intercept_sym_addr(strlen_ptr, pre_cb as *mut c_void, ptr::null_mut(), 0)
     };
     assert!(dup.is_null(), "intercept_sym_addr check failed");
     assert_eq!(
@@ -118,7 +110,7 @@ pub fn intercept_sym_addr_basic() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_RECORD,
             c"bad lib.so".as_ptr(),
             c"named_strlen".as_ptr(),
@@ -135,7 +127,7 @@ pub fn intercept_sym_addr_basic() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_RECORD,
             c"named-lib.so".as_ptr(),
             c"bad sym".as_ptr(),
@@ -152,7 +144,7 @@ pub fn intercept_sym_addr_basic() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_READ_ONLY | INTERCEPT_RECORD,
             c"named-lib.so".as_ptr(),
             c"named_strlen".as_ptr(),
@@ -174,7 +166,7 @@ pub fn intercept_sym_addr_basic() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_READ_WRITE,
         )
     };
@@ -194,7 +186,7 @@ pub fn intercept_sym_addr_basic() {
         srx_inline_hook_intercept_sym_addr(
             strlen_ptr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_WRITE_ONLY,
         )
     };

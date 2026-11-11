@@ -1,13 +1,15 @@
 // 验证 prologue 内部相对跳转能重定位到 trampoline 对应偏移
 // arm64 覆盖 CBZ，x86_64 覆盖 JNZ rel8
 
+use core::arch::global_asm;
 use core::ffi::c_void;
+use core::mem;
 use std::sync::Mutex;
 
 use srx_inline_hook::{HookStub, hook_single, prev_func, unhook};
 
 #[cfg(target_arch = "aarch64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl target_fix_addr_branch",
     ".type target_fix_addr_branch, %function",
     "target_fix_addr_branch:",
@@ -21,7 +23,7 @@ core::arch::global_asm!(
 // x86_64 prologue 内含 JNZ 到 RET，重写后必须映射到 trampoline 内
 // rdi==0 返回 42；rdi!=0 返回 7
 #[cfg(target_arch = "x86_64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl target_fix_addr_branch",
     ".type target_fix_addr_branch, @function",
     "target_fix_addr_branch:",
@@ -45,7 +47,7 @@ extern "C" fn replacement_fix_addr(x: u64) -> u64 {
     // SAFETY: hook 期间 stub 有效
     let prev = unsafe { prev_func(stub).expect("prev fix") };
     // SAFETY: trampoline ABI 与原函数一致
-    let prev_fn: extern "C" fn(u64) -> u64 = unsafe { core::mem::transmute(prev) };
+    let prev_fn: extern "C" fn(u64) -> u64 = unsafe { mem::transmute(prev) };
     prev_fn(x).wrapping_add(1000)
 }
 

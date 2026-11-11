@@ -2,8 +2,11 @@
 // 容量耗尽覆盖最旧项，关闭时不记录
 
 use core::ffi::{CStr, c_void};
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::collections::VecDeque;
+use std::env;
 use std::sync::Mutex;
 
 use bitflags::bitflags;
@@ -267,13 +270,7 @@ pub fn dump_to_fd(fd: i32, items: RecordItems) -> Result<usize, Errno> {
     while written < bytes.len() {
         let remaining = &bytes[written..];
         // SAFETY: fd >= 0 由上方检查；buf 指针覆盖 remaining.len() 字节
-        let n = unsafe {
-            libc::write(
-                fd,
-                remaining.as_ptr() as *const core::ffi::c_void,
-                remaining.len(),
-            )
-        };
+        let n = unsafe { libc::write(fd, remaining.as_ptr() as *const c_void, remaining.len()) };
         if n < 0 {
             // SAFETY: bionic __errno 返回线程内有效 errno 槽位指针
             let err = unsafe { *libc::__errno() };
@@ -411,7 +408,7 @@ fn default_caller_lib_name_by_addr(addr: usize) -> Option<String> {
 
 fn default_caller_lib_name() -> Option<String> {
     normalized_name(
-        std::env::current_exe()
+        env::current_exe()
             .ok()
             .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
             .as_deref(),
@@ -433,16 +430,16 @@ fn normalized_name(name: Option<&str>) -> Option<String> {
 
 fn timestamp_ms() -> u64 {
     // SAFETY: gettimeofday 仅读系统时钟
-    let mut tv: libc::timeval = unsafe { core::mem::zeroed() };
+    let mut tv: libc::timeval = unsafe { mem::zeroed() };
     // SAFETY: tv 已完整初始化
-    unsafe { libc::gettimeofday(&mut tv, core::ptr::null_mut()) };
+    unsafe { libc::gettimeofday(&mut tv, ptr::null_mut()) };
     tv.tv_sec as u64 * 1000 + tv.tv_usec as u64 / 1000
 }
 
 fn format_timestamp_ms(ts_ms: u64) -> String {
     let secs = (ts_ms / 1000) as libc::time_t;
     let millis = ts_ms % 1000;
-    let mut tm: libc::tm = unsafe { core::mem::zeroed() };
+    let mut tm: libc::tm = unsafe { mem::zeroed() };
     // SAFETY: secs 与 tm 指针有效；上游 recorder 固定输出 +00:00
     unsafe { libc::gmtime_r(&secs, &mut tm) };
     format!(

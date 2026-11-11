@@ -1,3 +1,6 @@
+use core::mem;
+use std::process;
+
 use super::prelude::*;
 
 // dl_init / dl_fini callback 检查序：Disabled → init_errno → Android < 21 NotSupport → (pre && post NULL) InvalidArg
@@ -22,7 +25,7 @@ fn dl_cb(pre: *mut c_void) -> Option<DlInfoCallback> {
     if pre.is_null() {
         None
     } else {
-        Some(unsafe { core::mem::transmute::<*mut c_void, DlInfoCallback>(pre) })
+        Some(unsafe { mem::transmute::<*mut c_void, DlInfoCallback>(pre) })
     }
 }
 
@@ -109,7 +112,7 @@ pub unsafe extern "C" fn srx_inline_hook_disallow_reentrant(return_address: *mut
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn srx_inline_hook_get_return_address() -> *mut c_void {
     if !shared_stack::has_frame() {
-        std::process::abort();
+        process::abort();
     }
     shared_stack::current_return_address()
 }

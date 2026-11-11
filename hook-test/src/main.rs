@@ -1,4 +1,7 @@
 #[cfg(target_os = "android")]
+use std::env;
+
+#[cfg(target_os = "android")]
 mod scenarios;
 #[cfg(target_os = "android")]
 mod test_ctx;
@@ -6,7 +9,7 @@ mod test_ctx;
 #[cfg(target_os = "android")]
 fn main() {
     println!("{}", srx_inline_hook::get_version());
-    if std::env::args().nth(1).as_deref() == Some("--probe-init-multi") {
+    if env::args().nth(1).as_deref() == Some("--probe-init-multi") {
         scenarios::init_shape::init_multi_first_probe();
         return;
     }

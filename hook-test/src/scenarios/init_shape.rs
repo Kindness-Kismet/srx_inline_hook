@@ -1,6 +1,7 @@
 // init 只采纳首次 mode / debuggable；后续调用保持幂等
 // main 已先以 Unique 初始化，此处验证后续调用不覆盖
 
+use std::env;
 use std::process::Command;
 
 use srx_inline_hook::{HookMode, get_init_errno, get_mode, init, is_debug, set_debug};
@@ -17,7 +18,7 @@ pub fn init_multi_first_probe() {
 }
 
 pub fn init_multi_first_process() {
-    let exe = std::env::current_exe().expect("current_exe");
+    let exe = env::current_exe().expect("current_exe");
     let exe_dir = exe.parent().expect("exe parent");
     let output = Command::new(&exe)
         .current_dir(exe_dir)

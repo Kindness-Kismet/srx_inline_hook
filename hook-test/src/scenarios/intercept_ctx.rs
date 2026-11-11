@@ -1,8 +1,14 @@
 // intercept CPU context：x86_64 下验证前 6 个整数参数；aarch64 再验证最小 FPSIMD 读写
 // pre 回调改写通用整参后，原函数应看到新值
 
+#[cfg(target_arch = "aarch64")]
+use core::arch::global_asm;
 use core::ffi::c_void;
+#[cfg(target_arch = "x86_64")]
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicU64, Ordering};
+use std::hint;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -59,12 +65,12 @@ static SEEN_FPCR: AtomicU64 = AtomicU64::new(0);
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn ctx_target(a0: u64, a1: u64, a2: u64, a3: u64, a4: u64, a5: u64) -> u64 {
-    std::hint::black_box(a0)
-        .wrapping_add(std::hint::black_box(a1))
-        .wrapping_add(std::hint::black_box(a2))
-        .wrapping_add(std::hint::black_box(a3))
-        .wrapping_add(std::hint::black_box(a4))
-        .wrapping_add(std::hint::black_box(a5))
+    hint::black_box(a0)
+        .wrapping_add(hint::black_box(a1))
+        .wrapping_add(hint::black_box(a2))
+        .wrapping_add(hint::black_box(a3))
+        .wrapping_add(hint::black_box(a4))
+        .wrapping_add(hint::black_box(a5))
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -111,7 +117,7 @@ unsafe extern "C" {
 }
 
 #[cfg(target_arch = "aarch64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl arm64_ctx_call_target",
     ".type arm64_ctx_call_target, %function",
     "arm64_ctx_call_target:",
@@ -198,7 +204,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_READ_WRITE,
         )
     };
@@ -211,7 +217,7 @@ pub fn intercept_cpu_context_basic() {
 
     #[cfg(target_arch = "x86_64")]
     let target: extern "C" fn(u64, u64, u64, u64, u64, u64) -> u64 =
-        unsafe { core::mem::transmute(ctx_target as *const c_void) };
+        unsafe { mem::transmute(ctx_target as *const c_void) };
 
     #[cfg(target_arch = "x86_64")]
     let v = target(1, 2, 3, 4, 5, 6);
@@ -291,7 +297,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_RECORD,
             c"bad lib.so".as_ptr(),
             c"intercept_cpu_context_basic".as_ptr(),
@@ -308,7 +314,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_RECORD,
             c"ctx-target".as_ptr(),
             c"bad sym".as_ptr(),
@@ -325,7 +331,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_READ_ONLY | INTERCEPT_RECORD,
             c"ctx-target".as_ptr(),
             c"intercept_cpu_context_basic".as_ptr(),
@@ -344,7 +350,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_READ_WRITE,
         )
     };
@@ -361,7 +367,7 @@ pub fn intercept_cpu_context_basic() {
         srx_inline_hook_intercept_func_addr(
             target_addr,
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             INTERCEPT_FPSIMD_WRITE_ONLY,
         )
     };

@@ -2,12 +2,13 @@
 // 调用路径走 dlsym 返回地址，避开 LLVM 对 libc::strlen 的内联
 
 use core::ffi::{c_char, c_void};
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, Ordering};
 
 use srx_inline_hook::{hook_sym_name, hook_sym_name_callback, unhook};
 
-type StrlenFn = unsafe extern "C" fn(*const core::ffi::c_char) -> usize;
+type StrlenFn = unsafe extern "C" fn(*const c_char) -> usize;
 
 static ORIG_STRLEN: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 
@@ -15,13 +16,13 @@ fn orig_strlen_slot() -> *mut *const c_void {
     ORIG_STRLEN.as_ptr() as *mut *const c_void
 }
 
-extern "C" fn replacement_strlen_by_name(s: *const core::ffi::c_char) -> usize {
+extern "C" fn replacement_strlen_by_name(s: *const c_char) -> usize {
     let p = ORIG_STRLEN.load(Ordering::Acquire);
     if p.is_null() {
         return 0;
     }
     // SAFETY: hook 激活后 orig 槽由库写入，unhook 后清零
-    let orig: StrlenFn = unsafe { core::mem::transmute(p) };
+    let orig: StrlenFn = unsafe { mem::transmute(p) };
     // SAFETY: 由调用方保证 NUL 终止
     let real = unsafe { orig(s) };
     real + 2000
@@ -42,7 +43,7 @@ pub fn hook_sym_name_basic() {
         return;
     }
     // SAFETY: strlen_addr 来自 dlsym
-    let strlen_fn: StrlenFn = unsafe { core::mem::transmute(strlen_addr) };
+    let strlen_fn: StrlenFn = unsafe { mem::transmute(strlen_addr) };
 
     let probe = c"sym-name!";
     // SAFETY: probe 为 'static

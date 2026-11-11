@@ -1,11 +1,17 @@
 // 跳板池：按页 mmap RWX + 固定 slot 分配；free 走延迟复用以兼容仍在执行跳板的线程
 
+use core::ffi::c_void;
+use core::mem;
+use core::ptr;
 use core::ptr::NonNull;
+#[cfg(target_arch = "aarch64")]
+use std::fs;
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 
 use crate::android;
+use crate::arch::current;
 use crate::errno::Errno;
 
 // ARM64 最坏重定位 6×28 字节，另需续接跳转与独立入口中转各 16 字节。
@@ -42,7 +48,7 @@ static POOL: Lazy<Pool> = Lazy::new(|| Pool {
 fn monotonic_secs() -> u32 {
     // 加 86400 偏移避开 ts=0 歧义（flag 低 31 位=0 表示未 release）
     // SAFETY: clock_gettime 仅读取内核时钟
-    let mut ts: libc::timespec = unsafe { core::mem::zeroed() };
+    let mut ts: libc::timespec = unsafe { mem::zeroed() };
     unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts) };
     (ts.tv_sec as u32).wrapping_add(24 * 60 * 60)
 }
@@ -88,7 +94,7 @@ pub fn acquire_near(target: usize) -> Result<NonNull<u8>, Errno> {
 
 #[cfg(target_arch = "aarch64")]
 fn new_near_page(target: usize, range: (usize, usize)) -> Result<Page, Errno> {
-    let maps = std::fs::read_to_string("/proc/self/maps").map_err(|_| Errno::Oom)?;
+    let maps = fs::read_to_string("/proc/self/maps").map_err(|_| Errno::Oom)?;
     let page_bytes = android::page_size();
     let mut previous_end = (range.0 + page_bytes - 1) & !(page_bytes - 1);
     let mut candidates = Vec::new();
@@ -113,7 +119,7 @@ fn new_near_page(target: usize, range: (usize, usize)) -> Result<Page, Errno> {
     }
     candidates.sort_unstable_by_key(|address| address.abs_diff(target));
     for candidate in candidates {
-        let page = match new_page_at(candidate as *mut core::ffi::c_void) {
+        let page = match new_page_at(candidate as *mut c_void) {
             Ok(page) => page,
             Err(Errno::Oom) => continue,
             Err(error) => return Err(error),
@@ -137,9 +143,9 @@ pub unsafe fn prepare_entry_jump(
     #[cfg(target_arch = "aarch64")]
     {
         let relay = unsafe { trampoline.add(TRAMPOLINE_SIZE - 16) };
-        crate::arch::current::make_relative_jump(target, relay, patch)?;
+        current::make_relative_jump(target, relay, patch)?;
         let mut relay_bytes = [0u8; 16];
-        crate::arch::current::make_absolute_jump(replacement, &mut relay_bytes)?;
+        current::make_absolute_jump(replacement, &mut relay_bytes)?;
         unsafe {
             android::write_inst(relay, &relay_bytes);
             android::clear_icache(relay, relay_bytes.len());
@@ -149,7 +155,7 @@ pub unsafe fn prepare_entry_jump(
     #[cfg(not(target_arch = "aarch64"))]
     {
         let _ = (target, trampoline);
-        crate::arch::current::make_absolute_jump(replacement, patch)
+        current::make_absolute_jump(replacement, patch)
     }
 }
 
@@ -167,17 +173,17 @@ fn try_alloc_in_page(page: &mut Page, now: u32) -> Option<NonNull<u8>> {
         // SAFETY: i < slot_count 保证 slot 位于 page 有效区内
         let slot = unsafe { page.base.as_ptr().add(i * TRAMPOLINE_SIZE) };
         // SAFETY: slot 指向 RWX 页内 TRAMPOLINE_SIZE 字节
-        unsafe { core::ptr::write_bytes(slot, 0, TRAMPOLINE_SIZE) };
+        unsafe { ptr::write_bytes(slot, 0, TRAMPOLINE_SIZE) };
         return NonNull::new(slot);
     }
     None
 }
 
 fn new_page() -> Result<Page, Errno> {
-    new_page_at(core::ptr::null_mut())
+    new_page_at(ptr::null_mut())
 }
 
-fn new_page_at(address: *mut core::ffi::c_void) -> Result<Page, Errno> {
+fn new_page_at(address: *mut c_void) -> Result<Page, Errno> {
     let page_bytes = android::page_size();
     // 地址仅作提示，内核不得覆盖现有映射。
     let raw = unsafe {

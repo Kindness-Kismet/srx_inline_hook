@@ -1,3 +1,5 @@
+use core::mem;
+
 use super::prelude::*;
 
 // 公开 C ABI 的 intercept 入口
@@ -52,7 +54,7 @@ unsafe fn intercept_instr_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { mem::transmute(pre) };
     let r = unsafe {
         api::intercept_instr_addr_with_names_and_caller_addr(
             instr_addr,
@@ -80,7 +82,7 @@ unsafe fn intercept_func_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { mem::transmute(pre) };
     let r = unsafe {
         api::intercept_func_addr_with_names_and_caller_addr(
             func_addr,
@@ -108,7 +110,7 @@ unsafe fn intercept_sym_addr_impl(
         tls_errno::set(e);
         return ptr::null_mut();
     }
-    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { mem::transmute(pre) };
     let r = unsafe {
         api::intercept_sym_addr_with_names_and_caller_addr(
             sym_addr,
@@ -384,7 +386,7 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_impl(
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { mem::transmute(pre) };
     let r = unsafe {
         api::intercept_sym_name_with_caller_addr(
             lib_owned.as_c_str(),
@@ -428,11 +430,11 @@ unsafe extern "C" fn srx_inline_hook_intercept_sym_name_callback_impl(
         tls_errno::set(Errno::InvalidArg);
         return ptr::null_mut();
     };
-    let pre_fn: Interceptor = unsafe { core::mem::transmute(pre) };
+    let pre_fn: Interceptor = unsafe { mem::transmute(pre) };
     let hooked_fn = if hooked.is_null() {
         None
     } else {
-        Some(unsafe { core::mem::transmute::<*mut c_void, api::InterceptedCallback>(hooked) })
+        Some(unsafe { mem::transmute::<*mut c_void, api::InterceptedCallback>(hooked) })
     };
     let r = unsafe {
         api::intercept_sym_name_callback_with_caller_addr(

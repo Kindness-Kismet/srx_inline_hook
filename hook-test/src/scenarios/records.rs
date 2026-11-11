@@ -1,7 +1,10 @@
 // recordable 场景：开启后记录 hook / unhook 与 target 地址
 // 额外覆盖 dump_records_with_items 字段过滤语义
 
+use core::ffi::c_char;
 use core::ffi::c_void;
+use core::ptr;
+use std::hint;
 
 use srx_inline_hook::{
     RecordItems, clear_records, dump_records, dump_records_with_items, hook_sym_name,
@@ -139,8 +142,8 @@ pub fn recordable_dump() {
         hook_sym_name(
             c"libc.so",
             c"strlen",
-            sn_replacement as *const core::ffi::c_void,
-            core::ptr::null_mut(),
+            sn_replacement as *const c_void,
+            ptr::null_mut(),
         )
     };
     if let Ok(stub) = sn_result {
@@ -169,7 +172,7 @@ pub fn recordable_dump() {
         srx_inline_hook_intercept_func_addr(
             record_intercept_target as *mut c_void,
             record_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             c"named-func-lib.so".as_ptr(),
             c"record_intercept_target".as_ptr(),
@@ -211,7 +214,7 @@ pub fn recordable_dump() {
                 srx_inline_hook_intercept_sym_addr(
                     strlen_ptr,
                     record_intercept_pre as *mut c_void,
-                    core::ptr::null_mut(),
+                    ptr::null_mut(),
                     4,
                     c"named-lib.so".as_ptr(),
                     c"named_strlen".as_ptr(),
@@ -248,7 +251,7 @@ pub fn recordable_dump() {
                     srx_inline_hook_intercept_sym_addr(
                         strlen_ptr,
                         record_intercept_pre as *mut c_void,
-                        core::ptr::null_mut(),
+                        ptr::null_mut(),
                         4,
                         c"/system/lib64/named-lib.so".as_ptr(),
                         c"named_strlen".as_ptr(),
@@ -280,7 +283,7 @@ pub fn recordable_dump() {
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
             record_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -311,10 +314,10 @@ pub fn recordable_dump() {
             c"libctor_dtor_probe.so".as_ptr(),
             c"ctor_dtor_probe_add".as_ptr(),
             record_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
             record_intercepted_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(!pending_intercept_cb_stub.is_null(), "records check failed");
@@ -371,15 +374,15 @@ unsafe extern "C" {
         ...
     ) -> *mut c_void;
     fn srx_inline_hook_intercept_sym_name(
-        lib_name: *const core::ffi::c_char,
-        sym_name: *const core::ffi::c_char,
+        lib_name: *const c_char,
+        sym_name: *const c_char,
         pre: *mut c_void,
         data: *mut c_void,
         flags: u32,
     ) -> *mut c_void;
     fn srx_inline_hook_intercept_sym_name_callback(
-        lib_name: *const core::ffi::c_char,
-        sym_name: *const core::ffi::c_char,
+        lib_name: *const c_char,
+        sym_name: *const c_char,
         pre: *mut c_void,
         data: *mut c_void,
         flags: u32,
@@ -392,15 +395,15 @@ unsafe extern "C" {
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn record_intercept_target(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 extern "C" fn record_intercept_pre(_ctx: *mut c_void, _data: *mut c_void) {}
 
 extern "C" fn record_intercepted_cb(
     _error: i32,
-    _lib_name: *const core::ffi::c_char,
-    _sym_name: *const core::ffi::c_char,
+    _lib_name: *const c_char,
+    _sym_name: *const c_char,
     _sym_addr: *const c_void,
     _pre: *mut c_void,
     _data: *mut c_void,
@@ -408,6 +411,6 @@ extern "C" fn record_intercepted_cb(
 ) {
 }
 
-extern "C" fn sn_replacement(_s: *const core::ffi::c_char) -> usize {
+extern "C" fn sn_replacement(_s: *const c_char) -> usize {
     0
 }

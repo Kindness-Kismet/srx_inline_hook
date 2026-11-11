@@ -1,6 +1,8 @@
 // monitor_dlopen：注册 init/fini 回调后，dlopen/dlclose 测试 so 应收到 pre/post 通知
 
+use core::ffi::CStr;
 use core::ffi::c_void;
+use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 static INIT_PRE_HITS: AtomicUsize = AtomicUsize::new(0);
@@ -71,7 +73,7 @@ fn matches_probe(info: *mut libc::dl_phdr_info) -> bool {
     if info.dlpi_name.is_null() {
         return false;
     }
-    let Ok(name) = (unsafe { core::ffi::CStr::from_ptr(info.dlpi_name) }).to_str() else {
+    let Ok(name) = (unsafe { CStr::from_ptr(info.dlpi_name) }).to_str() else {
         return false;
     };
     name.ends_with("libctor_dtor_probe.so")
@@ -180,22 +182,14 @@ pub fn monitor_dlopen_callbacks() {
     let post_only_ptr = &mut post_only_marker as *mut usize as *mut c_void;
     assert_eq!(
         unsafe {
-            srx_inline_hook_register_dl_init_callback(
-                core::ptr::null_mut(),
-                init_post_ptr,
-                post_only_ptr,
-            )
+            srx_inline_hook_register_dl_init_callback(ptr::null_mut(), init_post_ptr, post_only_ptr)
         },
         0,
         "monitor_dlopen check failed"
     );
     assert_eq!(
         unsafe {
-            srx_inline_hook_register_dl_fini_callback(
-                core::ptr::null_mut(),
-                fini_post_ptr,
-                post_only_ptr,
-            )
+            srx_inline_hook_register_dl_fini_callback(ptr::null_mut(), fini_post_ptr, post_only_ptr)
         },
         0,
         "monitor_dlopen check failed"
@@ -238,7 +232,7 @@ pub fn monitor_dlopen_callbacks() {
     assert_eq!(
         unsafe {
             srx_inline_hook_unregister_dl_init_callback(
-                core::ptr::null_mut(),
+                ptr::null_mut(),
                 init_post_ptr,
                 post_only_ptr,
             )
@@ -249,7 +243,7 @@ pub fn monitor_dlopen_callbacks() {
     assert_eq!(
         unsafe {
             srx_inline_hook_unregister_dl_fini_callback(
-                core::ptr::null_mut(),
+                ptr::null_mut(),
                 fini_post_ptr,
                 post_only_ptr,
             )
@@ -271,22 +265,14 @@ pub fn monitor_dlopen_callbacks() {
     let pre_only_ptr = &mut pre_only_marker as *mut usize as *mut c_void;
     assert_eq!(
         unsafe {
-            srx_inline_hook_register_dl_init_callback(
-                init_pre_ptr,
-                core::ptr::null_mut(),
-                pre_only_ptr,
-            )
+            srx_inline_hook_register_dl_init_callback(init_pre_ptr, ptr::null_mut(), pre_only_ptr)
         },
         0,
         "monitor_dlopen check failed"
     );
     assert_eq!(
         unsafe {
-            srx_inline_hook_register_dl_fini_callback(
-                fini_pre_ptr,
-                core::ptr::null_mut(),
-                pre_only_ptr,
-            )
+            srx_inline_hook_register_dl_fini_callback(fini_pre_ptr, ptr::null_mut(), pre_only_ptr)
         },
         0,
         "monitor_dlopen check failed"
@@ -328,22 +314,14 @@ pub fn monitor_dlopen_callbacks() {
 
     assert_eq!(
         unsafe {
-            srx_inline_hook_unregister_dl_init_callback(
-                init_pre_ptr,
-                core::ptr::null_mut(),
-                pre_only_ptr,
-            )
+            srx_inline_hook_unregister_dl_init_callback(init_pre_ptr, ptr::null_mut(), pre_only_ptr)
         },
         0,
         "monitor_dlopen check failed"
     );
     assert_eq!(
         unsafe {
-            srx_inline_hook_unregister_dl_fini_callback(
-                fini_pre_ptr,
-                core::ptr::null_mut(),
-                pre_only_ptr,
-            )
+            srx_inline_hook_unregister_dl_fini_callback(fini_pre_ptr, ptr::null_mut(), pre_only_ptr)
         },
         0,
         "monitor_dlopen check failed"

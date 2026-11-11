@@ -2,6 +2,7 @@
 // bionic dladdr 仅保证 so 级别定位；细粒度 sym_name 需 ELF 解析
 
 use core::ffi::c_void;
+use core::mem;
 
 use crate::util::cstr_from_ptr_no_libc;
 
@@ -20,7 +21,7 @@ pub struct AddrInfo {
 )]
 pub fn addr_info(addr: *const c_void) -> Option<AddrInfo> {
     // SAFETY: Dl_info 零初始化；dladdr 仅按字段写入
-    let mut info: libc::Dl_info = unsafe { core::mem::zeroed() };
+    let mut info: libc::Dl_info = unsafe { mem::zeroed() };
     // SAFETY: addr 由调用方传入；libc::dladdr 对任意地址安全
     let rc = unsafe { libc::dladdr(addr, &mut info) };
     if rc == 0 {

@@ -1,3 +1,5 @@
+use core::ffi::CStr;
+
 use super::*;
 
 pub(super) fn run() {
@@ -6,7 +8,7 @@ pub(super) fn run() {
     let ver_ptr = unsafe { srx_inline_hook_get_version() };
     assert!(!ver_ptr.is_null(), "state check failed");
     // SAFETY: ver_ptr 为 NUL 终止字符串
-    let ver = unsafe { core::ffi::CStr::from_ptr(ver_ptr) }
+    let ver = unsafe { CStr::from_ptr(ver_ptr) }
         .to_str()
         .expect("version utf8");
     let expected_version = format!("srx_inline_hook version {}", env!("CARGO_PKG_VERSION"));
@@ -58,7 +60,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(disabled_hook.is_null(), "state check failed");
@@ -71,7 +73,7 @@ pub(super) fn run() {
         srx_inline_hook_intercept_func_addr(
             capi_intercept_target as *mut c_void,
             capi_intercepted_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -98,8 +100,8 @@ pub(super) fn run() {
     let disabled_dl_cb = unsafe {
         srx_inline_hook_register_dl_init_callback(
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert_eq!(disabled_dl_cb, 45, "state check failed");
@@ -111,8 +113,8 @@ pub(super) fn run() {
     let disabled_dl_unreg = unsafe {
         srx_inline_hook_unregister_dl_init_callback(
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert_eq!(disabled_dl_unreg, 45, "state check failed");
@@ -124,8 +126,8 @@ pub(super) fn run() {
     let disabled_fini_reg = unsafe {
         srx_inline_hook_register_dl_fini_callback(
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert_eq!(disabled_fini_reg, 45, "state check failed");
@@ -137,8 +139,8 @@ pub(super) fn run() {
     let disabled_fini_unreg = unsafe {
         srx_inline_hook_unregister_dl_fini_callback(
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert_eq!(disabled_fini_unreg, 45, "state check failed");
@@ -156,12 +158,7 @@ pub(super) fn run() {
     // 2.2) capi NULL 校验写 tls_errno = InvalidArg 并返 NULL
     // SAFETY: 故意 NULL 触发前置校验
     let null_stub = unsafe {
-        srx_inline_hook_hook_sym_name(
-            core::ptr::null(),
-            core::ptr::null(),
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
-        )
+        srx_inline_hook_hook_sym_name(ptr::null(), ptr::null(), ptr::null_mut(), ptr::null_mut())
     };
     assert!(null_stub.is_null(), "state check failed");
     // SAFETY: get_errno 必须读到 InvalidArg(3)
@@ -173,7 +170,7 @@ pub(super) fn run() {
 
     // 2.3) _unhook(NULL)：返 -1，tls_errno = InvalidArg(3)
     // SAFETY: 显式 NULL 触发前置校验
-    let null_unhook = unsafe { srx_inline_hook_unhook(core::ptr::null_mut()) };
+    let null_unhook = unsafe { srx_inline_hook_unhook(ptr::null_mut()) };
     assert_eq!(null_unhook, -1, "state check failed");
     // SAFETY: 读 tls_errno
     assert_eq!(
@@ -232,12 +229,12 @@ pub(super) fn run() {
         (45, "Disabled"),
     ];
     for (code, expected) in expected_errmsg {
-        let actual = unsafe { core::ffi::CStr::from_ptr(srx_inline_hook_to_errmsg(code)) }
+        let actual = unsafe { CStr::from_ptr(srx_inline_hook_to_errmsg(code)) }
             .to_str()
             .expect("errmsg utf8");
         assert_eq!(actual, expected, "state check failed: {}, {}", code, actual);
     }
-    let overlap_msg = unsafe { core::ffi::CStr::from_ptr(srx_inline_hook_to_errmsg(101)) }
+    let overlap_msg = unsafe { CStr::from_ptr(srx_inline_hook_to_errmsg(101)) }
         .to_str()
         .expect("overlap errmsg utf8");
     assert_eq!(
@@ -249,7 +246,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr(
             capi_overlap_a as *mut c_void,
             capi_overlap_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(!overlap_stub_a.is_null(), "state check failed");
@@ -262,7 +259,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr(
             capi_overlap_b as *mut c_void,
             capi_overlap_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(overlap_stub_b.is_null(), "state check failed");

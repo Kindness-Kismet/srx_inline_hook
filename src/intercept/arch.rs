@@ -1,3 +1,6 @@
+#[cfg(target_arch = "x86_64")]
+use core::mem;
+
 use super::*;
 
 pub(super) unsafe fn bytesig_build_launcher(buf: *mut u8, target: *mut u8) -> Result<(), Errno> {
@@ -336,8 +339,7 @@ extern "C" fn intercept_dispatch_and_get_next_hop_x86_64(
 ) -> *mut c_void {
     let target_ptr = target as *mut u8;
     let mut ctx = SrxInlineHookCpuContext::default();
-    let original_sp =
-        unsafe { (saved as *const u8).add(core::mem::size_of::<SavedRegsX86_64>() + 8) };
+    let original_sp = unsafe { (saved as *const u8).add(mem::size_of::<SavedRegsX86_64>() + 8) };
     let saved = unsafe { &mut *saved };
     ctx.regs[0] = saved.rdi;
     ctx.regs[1] = saved.rsi;

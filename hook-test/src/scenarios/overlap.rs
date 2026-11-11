@@ -1,11 +1,12 @@
 // overlap 防踩踏：两个紧邻函数的 patch 区间相交时 HookOverlap 拦截
 // layout：neighbor_a 占 12B，neighbor_b 紧接 a+12；hook a 后 hook b 必然相交
 
+use core::arch::global_asm;
 use core::ffi::c_void;
 
 use srx_inline_hook::{Errno, hook_single, unhook};
 
-core::arch::global_asm!(
+global_asm!(
     ".globl neighbor_a",
     ".type neighbor_a, %function",
     "neighbor_a:",

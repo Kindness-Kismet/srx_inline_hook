@@ -2,7 +2,9 @@
 // unhook 后条目应消失；has_orig_slot 与是否传 orig_addr 对齐
 
 use core::ffi::c_void;
+use core::mem;
 use core::ptr;
+use core::sync::atomic::Ordering;
 
 use srx_inline_hook::{hook_with_orig, list_hooks, prev_func, unhook};
 
@@ -13,14 +15,14 @@ use crate::test_ctx::{
 static mut ORIG_MUL: *const c_void = ptr::null();
 
 extern "C" fn replacement_mul_via_orig(a: i64, b: i64) -> i64 {
-    HITS_MUL.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+    HITS_MUL.fetch_add(1, Ordering::SeqCst);
     // SAFETY: ORIG_MUL 槽在 hook 存活期间持有跳板地址
     let orig = unsafe { ORIG_MUL };
     if orig.is_null() {
         return a.wrapping_mul(b);
     }
     // SAFETY: 跳板 ABI 与 target_mul 一致
-    let f: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(orig) };
+    let f: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(orig) };
     f(a, b).wrapping_add(7)
 }
 
@@ -76,12 +78,12 @@ pub fn list_hooks_basic() {
     assert!(mul_entry.has_orig_slot, "list_hooks check failed");
 
     // 触发一次，确保 tramp_addr 对应跳板仍可调用
-    HITS_ADD.store(0, core::sync::atomic::Ordering::SeqCst);
-    HITS_MUL.store(0, core::sync::atomic::Ordering::SeqCst);
+    HITS_ADD.store(0, Ordering::SeqCst);
+    HITS_MUL.store(0, Ordering::SeqCst);
     assert_eq!(target_add(3, 4), 1007);
     assert_eq!(target_mul(3, 4), 19);
-    assert_eq!(HITS_ADD.load(core::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(HITS_MUL.load(core::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(HITS_ADD.load(Ordering::SeqCst), 1);
+    assert_eq!(HITS_MUL.load(Ordering::SeqCst), 1);
 
     // prev_func 返回值应等于 list_hooks 里的 tramp_addr
     // SAFETY: stub 有效

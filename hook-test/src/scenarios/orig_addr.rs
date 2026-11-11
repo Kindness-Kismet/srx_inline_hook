@@ -2,6 +2,7 @@
 // replacement 可直接调用该槽，省去 prev_func 查询
 
 use core::ffi::c_void;
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicPtr, Ordering};
 
@@ -23,7 +24,7 @@ extern "C" fn replacement_mul_via_orig(a: i64, b: i64) -> i64 {
         return a.wrapping_mul(b);
     }
     // SAFETY: hook 激活前 orig_addr 已写入；unhook 后清零由库保证
-    let orig: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(p) };
+    let orig: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(p) };
     orig(a, b).wrapping_add(7)
 }
 

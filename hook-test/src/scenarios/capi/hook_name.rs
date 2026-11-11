@@ -1,3 +1,5 @@
+use core::ffi::CStr;
+
 use super::*;
 
 pub(super) fn run() {
@@ -17,7 +19,7 @@ pub(super) fn run() {
         println!("capi_hook_name: skipped");
         return;
     }
-    let mut strlen_info: libc::Dl_info = unsafe { core::mem::zeroed() };
+    let mut strlen_info: libc::Dl_info = unsafe { mem::zeroed() };
     let strlen_dladdr = unsafe { libc::dladdr(strlen_ptr, &mut strlen_info) };
     if strlen_dladdr == 0 || strlen_info.dli_fname.is_null() {
         println!("capi_hook_name: skipped");
@@ -30,7 +32,7 @@ pub(super) fn run() {
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             1,
         )
     };
@@ -48,7 +50,7 @@ pub(super) fn run() {
     let probe = c"capi-hi";
     // SAFETY: strlen_ptr 指向 libc 可执行代码；ABI 与 C strlen 一致
     let hooked_len = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(probe.as_ptr())
     };
     assert_eq!(hooked_len, 7 + 500, "hook_name check failed");
@@ -66,7 +68,7 @@ pub(super) fn run() {
     let unhook_rc = unsafe { srx_inline_hook_unhook(stub) };
     assert_eq!(unhook_rc, 0, "hook_name check failed");
     unsafe {
-        CAPI_STUB = core::ptr::null_mut();
+        CAPI_STUB = ptr::null_mut();
     }
 
     // get_records: ALL=0x7FF 应返回完整记录项文本
@@ -74,7 +76,7 @@ pub(super) fn run() {
     let recs_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!recs_ptr.is_null(), "hook_name check failed");
     // SAFETY: recs_ptr 为 NUL 终止
-    let recs = unsafe { core::ffi::CStr::from_ptr(recs_ptr) }
+    let recs = unsafe { CStr::from_ptr(recs_ptr) }
         .to_str()
         .expect("records utf8");
     assert!(recs.contains("unhook"), "hook_name check failed: {}", recs);
@@ -117,10 +119,10 @@ pub(super) fn run() {
     let mixed_items = extra_only | (1u32 << 31);
     let recs_ptr4 = unsafe { srx_inline_hook_get_records(mixed_items) };
     assert!(!recs_ptr4.is_null(), "hook_name check failed");
-    let recs3 = unsafe { core::ffi::CStr::from_ptr(recs_ptr3) }
+    let recs3 = unsafe { CStr::from_ptr(recs_ptr3) }
         .to_str()
         .expect("records extra utf8");
-    let recs4 = unsafe { core::ffi::CStr::from_ptr(recs_ptr4) }
+    let recs4 = unsafe { CStr::from_ptr(recs_ptr4) }
         .to_str()
         .expect("records mixed utf8");
     assert!(
@@ -163,13 +165,13 @@ pub(super) fn run() {
 
     // 6) hook_sym_name_callback：调用 hooked 回调一次，error 应为 0
     let mut cb_error: c_int = -1;
-    let mut orig_slot: *mut c_void = core::ptr::null_mut();
+    let mut orig_slot: *mut c_void = ptr::null_mut();
     let orig_slot_addr = &mut orig_slot as *mut *mut c_void;
     // 复位 cb 观察槽
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
-    CAPI_CB_SYM.store(core::ptr::null_mut(), Ordering::Release);
-    CAPI_CB_NEW_ADDR.store(core::ptr::null_mut(), Ordering::Release);
-    CAPI_CB_ARG.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_SYM.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_NEW_ADDR.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_ARG.store(ptr::null_mut(), Ordering::Release);
     *CAPI_CB_LIB_NAME_TEXT.lock().expect("reset hook cb lib") = None;
     *CAPI_CB_SYM_NAME_TEXT.lock().expect("reset hook cb sym") = None;
     // SAFETY: 同 hook_sym_name
@@ -223,15 +225,15 @@ pub(super) fn run() {
         "hook_name check failed"
     );
     // orig_addr 参数 = 用户传入的槽位指针本身
-    let seen_orig = CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire);
+    let seen_orig = CAPI_CB_ORIG_ADDR.load(Ordering::Acquire);
     assert_eq!(
         seen_orig as *const c_void, orig_slot_addr as *const c_void,
         "hook_name check failed"
     );
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
-    CAPI_CB_SYM.store(core::ptr::null_mut(), Ordering::Release);
-    CAPI_CB_NEW_ADDR.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_SYM.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_NEW_ADDR.store(ptr::null_mut(), Ordering::Release);
     let stub2_dup = unsafe {
         srx_inline_hook_hook_sym_name_callback(
             c"libc.so".as_ptr(),
@@ -260,7 +262,7 @@ pub(super) fn run() {
         "hook_name check failed"
     );
     assert_eq!(
-        CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire),
+        CAPI_CB_ORIG_ADDR.load(Ordering::Acquire),
         orig_slot_addr as *mut c_void,
         "hook_name check failed"
     );
@@ -268,12 +270,12 @@ pub(super) fn run() {
     let rc2 = unsafe { srx_inline_hook_unhook(stub2) };
     assert_eq!(rc2, 0);
     unsafe {
-        CAPI_STUB = core::ptr::null_mut();
+        CAPI_STUB = ptr::null_mut();
     }
 
     // callback 可为 NULL：成功路径仍应安装成功，且不触发回调写槽
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
     let stub2_null_cb = unsafe {
         srx_inline_hook_hook_sym_name_callback(
             libc_name.as_ptr(),
@@ -292,15 +294,15 @@ pub(super) fn run() {
     );
     assert_eq!(cb_error, -1, "hook_name check failed");
     assert_eq!(
-        CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire),
-        core::ptr::null_mut(),
+        CAPI_CB_ORIG_ADDR.load(Ordering::Acquire),
+        ptr::null_mut(),
         "hook_name check failed"
     );
     let rc2_null_cb = unsafe { srx_inline_hook_unhook(stub2_null_cb) };
     assert_eq!(rc2_null_cb, 0, "hook_name check failed");
 
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
     let bad_stub2 = unsafe {
         srx_inline_hook_hook_sym_name_callback_2(
             libc_name.as_ptr(),
@@ -321,13 +323,13 @@ pub(super) fn run() {
     assert_eq!(cb_error, -1, "hook_name check failed");
 
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
     let multi_cb_null_orig = unsafe {
         srx_inline_hook_hook_sym_name_callback_2(
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4,
             Some(capi_hooked_cb),
             &mut cb_error as *mut c_int as *mut c_void,
@@ -342,8 +344,8 @@ pub(super) fn run() {
     assert_eq!(cb_error, -1, "hook_name check failed");
 
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
-    CAPI_CB_NEW_ADDR.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_NEW_ADDR.store(ptr::null_mut(), Ordering::Release);
     let stub2_flags = unsafe {
         srx_inline_hook_hook_sym_name_callback_2(
             libc_name.as_ptr(),
@@ -375,15 +377,15 @@ pub(super) fn run() {
         "hook_name check failed"
     );
     assert_eq!(
-        CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire),
+        CAPI_CB_ORIG_ADDR.load(Ordering::Acquire),
         orig_slot_addr as *mut c_void,
         "hook_name check failed"
     );
 
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
-    CAPI_CB_SYM.store(core::ptr::null_mut(), Ordering::Release);
-    CAPI_CB_NEW_ADDR.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_SYM.store(ptr::null_mut(), Ordering::Release);
+    CAPI_CB_NEW_ADDR.store(ptr::null_mut(), Ordering::Release);
     let stub2_flags_dup = unsafe {
         srx_inline_hook_hook_sym_name_callback_2(
             libc_name.as_ptr(),
@@ -413,18 +415,18 @@ pub(super) fn run() {
         "hook_name check failed"
     );
     assert_eq!(
-        CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire),
+        CAPI_CB_ORIG_ADDR.load(Ordering::Acquire),
         orig_slot_addr as *mut c_void,
         "hook_name check failed"
     );
     let rc2_flags = unsafe { srx_inline_hook_unhook(stub2_flags) };
     assert_eq!(rc2_flags, 0, "hook_name check failed");
     unsafe {
-        CAPI_STUB = core::ptr::null_mut();
+        CAPI_STUB = ptr::null_mut();
     }
 
     cb_error = -1;
-    CAPI_CB_ORIG_ADDR.store(core::ptr::null_mut(), core::sync::atomic::Ordering::Release);
+    CAPI_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
     let stub2_flags_null_cb = unsafe {
         srx_inline_hook_hook_sym_name_callback_2(
             libc_name.as_ptr(),
@@ -444,8 +446,8 @@ pub(super) fn run() {
     );
     assert_eq!(cb_error, -1, "hook_name check failed");
     assert_eq!(
-        CAPI_CB_ORIG_ADDR.load(core::sync::atomic::Ordering::Acquire),
-        core::ptr::null_mut(),
+        CAPI_CB_ORIG_ADDR.load(Ordering::Acquire),
+        ptr::null_mut(),
         "hook_name check failed"
     );
     let rc2_flags_null_cb = unsafe { srx_inline_hook_unhook(stub2_flags_null_cb) };

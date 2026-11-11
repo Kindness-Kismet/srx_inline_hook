@@ -2,6 +2,9 @@
 // 对齐 manual 标注的异步信号安全公开合同
 
 use core::ffi::c_int;
+use core::ffi::c_void;
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use srx_inline_hook::{set_recordable, unhook};
@@ -25,7 +28,7 @@ fn read_all(fd: i32) -> Vec<u8> {
     let mut out = Vec::new();
     let mut buf = [0u8; 4096];
     loop {
-        let n = unsafe { libc::read(fd, buf.as_mut_ptr() as *mut core::ffi::c_void, buf.len()) };
+        let n = unsafe { libc::read(fd, buf.as_mut_ptr() as *mut c_void, buf.len()) };
         if n <= 0 {
             break;
         }
@@ -43,11 +46,11 @@ pub fn dump_in_signal_handler() {
     );
     let (rd, wr) = (fds[0], fds[1]);
 
-    let mut act: libc::sigaction = unsafe { core::mem::zeroed() };
+    let mut act: libc::sigaction = unsafe { mem::zeroed() };
     unsafe { libc::sigemptyset(&mut act.sa_mask) };
     act.sa_flags = 0;
     act.sa_sigaction = dump_signal_handler as *const () as usize;
-    let mut old_act: libc::sigaction = unsafe { core::mem::zeroed() };
+    let mut old_act: libc::sigaction = unsafe { mem::zeroed() };
     assert_eq!(
         unsafe { libc::sigaction(libc::SIGUSR1, &act, &mut old_act) },
         0,
@@ -75,7 +78,7 @@ pub fn dump_in_signal_handler() {
     let dumped = read_all(rd);
     unsafe {
         libc::close(rd);
-        libc::sigaction(libc::SIGUSR1, &old_act, core::ptr::null_mut());
+        libc::sigaction(libc::SIGUSR1, &old_act, ptr::null_mut());
     }
     set_recordable(was_recordable);
 

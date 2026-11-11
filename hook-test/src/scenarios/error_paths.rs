@@ -3,6 +3,7 @@
 
 use core::ffi::{CStr, c_void};
 use core::ptr;
+use std::error::Error;
 
 use srx_inline_hook::{
     Errno, clear_records, dump_records, errno_to_message, get_errno, hook_single, hook_sym_name,
@@ -165,7 +166,7 @@ pub fn error_paths() {
     assert_eq!(shown, "invalid argument (errno=3)");
 
     // std::error::Error 关联：via trait object 也能拿到 description
-    let e: &dyn std::error::Error = &Errno::HookOverlap;
+    let e: &dyn Error = &Errno::HookOverlap;
     assert_eq!(
         e.to_string(),
         "patch range overlaps an existing hook (errno=101)"

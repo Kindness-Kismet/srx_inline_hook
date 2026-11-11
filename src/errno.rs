@@ -1,6 +1,9 @@
 // 错误码：数值与 SRX_INLINE_HOOK_ERRNO_* 宏对齐便于跨端排障
 // RewriteUnsupported / HookOverlap / InitSigill 为扩展码
 
+use core::fmt;
+use std::error::Error;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum Errno {
@@ -224,10 +227,10 @@ pub fn errno_to_message(code: i32) -> &'static str {
     }
 }
 
-impl core::fmt::Display for Errno {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Display for Errno {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} (errno={})", self.message(), *self as i32)
     }
 }
 
-impl std::error::Error for Errno {}
+impl Error for Errno {}

@@ -4,7 +4,10 @@
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use core::arch::global_asm;
 use core::ffi::c_void;
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::hint;
 
 use srx_inline_hook::{HookStub, hook_with_orig, unhook};
 
@@ -50,7 +53,7 @@ unsafe extern "C" {
     fn srx_inline_hook_unintercept(stub: *mut c_void) -> i32;
 }
 
-static mut ORIG_UNWIND: *const c_void = core::ptr::null();
+static mut ORIG_UNWIND: *const c_void = ptr::null();
 static HOOK_BT_HITS: AtomicUsize = AtomicUsize::new(0);
 static INTERCEPT_BT_HITS: AtomicUsize = AtomicUsize::new(0);
 static HOOK_SAW_PROBE: AtomicBool = AtomicBool::new(false);
@@ -59,14 +62,14 @@ static INTERCEPT_SAW_PROBE: AtomicBool = AtomicBool::new(false);
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn unwind_target(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn unwind_fp_hook_probe(a: i64, b: i64) -> i64 {
     let result = unwind_target(a, b);
-    std::hint::black_box(a);
+    hint::black_box(a);
     result
 }
 
@@ -74,7 +77,7 @@ extern "C" fn unwind_fp_hook_probe(a: i64, b: i64) -> i64 {
 #[inline(never)]
 extern "C" fn unwind_fp_intercept_probe(a: i64, b: i64) -> i64 {
     let result = unwind_target(a, b);
-    std::hint::black_box(b);
+    hint::black_box(b);
     result
 }
 
@@ -90,7 +93,7 @@ fn capture_fp_backtrace() -> Vec<usize> {
     let mut last = 0usize;
     while !frame.is_null() && frames.len() < 64 {
         let frame_addr = frame as usize;
-        if frame_addr <= last || (frame_addr & (core::mem::size_of::<usize>() - 1)) != 0 {
+        if frame_addr <= last || (frame_addr & (mem::size_of::<usize>() - 1)) != 0 {
             break;
         }
         let ret = unsafe { *frame.add(1) };
@@ -135,7 +138,7 @@ extern "C" fn unwind_hook_replacement(a: i64, b: i64) -> i64 {
     HOOK_BT_HITS.fetch_add(1, Ordering::SeqCst);
     let saw_probe = capture_backtrace_contains_symbol(unwind_fp_hook_probe as *const c_void);
     HOOK_SAW_PROBE.store(saw_probe, Ordering::SeqCst);
-    let orig: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(ORIG_UNWIND) };
+    let orig: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(ORIG_UNWIND) };
     orig(a, b) + 100
 }
 
@@ -150,7 +153,7 @@ pub fn fp_unwind_basic() {
     INTERCEPT_BT_HITS.store(0, Ordering::SeqCst);
     HOOK_SAW_PROBE.store(false, Ordering::SeqCst);
     INTERCEPT_SAW_PROBE.store(false, Ordering::SeqCst);
-    unsafe { ORIG_UNWIND = core::ptr::null() };
+    unsafe { ORIG_UNWIND = ptr::null() };
 
     assert_eq!(
         enclosing_fn_addr(unwind_fp_hook_probe as *const c_void),
@@ -167,7 +170,7 @@ pub fn fp_unwind_basic() {
         hook_with_orig(
             unwind_target as *mut c_void,
             unwind_hook_replacement as *const c_void,
-            core::ptr::addr_of_mut!(ORIG_UNWIND),
+            ptr::addr_of_mut!(ORIG_UNWIND),
         )
         .expect("install unwind hook")
     };
@@ -187,7 +190,7 @@ pub fn fp_unwind_basic() {
         srx_inline_hook_intercept_func_addr(
             unwind_target as *mut c_void,
             unwind_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };

@@ -1,6 +1,8 @@
 // 场景路由：run_all 顺序编排 + 每个场景打名
 // 新增分组时：新建 scenarios/<name>.rs，在此 pub mod + run 一行
 
+use std::env;
+
 pub mod basic;
 pub mod capi;
 pub mod concurrent;
@@ -157,7 +159,7 @@ pub fn run_all() {
 }
 
 fn run(name: &str, scenario: fn()) {
-    if let Ok(filter) = std::env::var("HOOK_TEST_SCENARIO") {
+    if let Ok(filter) = env::var("HOOK_TEST_SCENARIO") {
         if filter != name {
             return;
         }

@@ -88,7 +88,7 @@ impl Switch {
         self.queue
             .first()
             .map(|n| n.new_addr)
-            .unwrap_or(core::ptr::null())
+            .unwrap_or(ptr::null())
     }
 }
 

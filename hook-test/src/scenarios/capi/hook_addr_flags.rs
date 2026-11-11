@@ -1,26 +1,18 @@
+use core::ffi::CStr;
+
 use super::*;
 
 pub(super) fn run() {
     // hook_func_addr_2 / sym_addr_2 flags 校验（固定 4 参签名）
     // SHARED_MODE + 无效 target：走 shared 安装主路径，rewriter 读 0x1 prologue 崩 → HookRewriteCrash(25)
     let f2_shared = unsafe {
-        srx_inline_hook_hook_func_addr_2(
-            0x1 as *mut c_void,
-            0x2 as *mut c_void,
-            core::ptr::null_mut(),
-            1,
-        )
+        srx_inline_hook_hook_func_addr_2(0x1 as *mut c_void, 0x2 as *mut c_void, ptr::null_mut(), 1)
     };
     assert!(f2_shared.is_null());
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 25);
     // MULTI + orig_addr=NULL：前置参数校验先拦截，应返回 InvalidArg(3)
     let s2_multi = unsafe {
-        srx_inline_hook_hook_sym_addr_2(
-            0x1 as *mut c_void,
-            0x2 as *mut c_void,
-            core::ptr::null_mut(),
-            4,
-        )
+        srx_inline_hook_hook_sym_addr_2(0x1 as *mut c_void, 0x2 as *mut c_void, ptr::null_mut(), 4)
     };
     assert!(s2_multi.is_null());
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 3);
@@ -30,7 +22,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr_2(
             0x1 as *mut c_void,
             0x2 as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0x100,
         )
     };
@@ -38,13 +30,13 @@ pub(super) fn run() {
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 3);
 
     let target_fn: extern "C" fn(i64, i64) -> i64 =
-        unsafe { core::mem::transmute(capi_intercept_target as *const c_void) };
+        unsafe { mem::transmute(capi_intercept_target as *const c_void) };
 
     let f2_shared_ok = unsafe {
         srx_inline_hook_hook_func_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             1,
         )
     };
@@ -59,7 +51,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_sym_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             2,
         )
     };
@@ -78,7 +70,7 @@ pub(super) fn run() {
     );
     assert_eq!(target_fn(1, 2), 3, "hook_addr_flags check failed");
 
-    let mut s2_multi_orig = core::ptr::null_mut();
+    let mut s2_multi_orig = ptr::null_mut();
     let s2_multi_ok = unsafe {
         srx_inline_hook_hook_sym_addr_2(
             capi_intercept_target as *mut c_void,
@@ -95,7 +87,7 @@ pub(super) fn run() {
     );
     assert!(!s2_multi_orig.is_null(), "hook_addr_flags check failed");
     assert_eq!(target_fn(2, 3), 905, "hook_addr_flags check failed");
-    let mut s2_multi_dup_orig = core::ptr::null_mut();
+    let mut s2_multi_dup_orig = ptr::null_mut();
     let s2_multi_dup = unsafe {
         srx_inline_hook_hook_sym_addr_2(
             capi_intercept_target as *mut c_void,
@@ -114,7 +106,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_sym_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             1,
         )
     };
@@ -137,7 +129,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             8,
             c"bad lib.so".as_ptr(),
             c"named_target_hook".as_ptr(),
@@ -153,7 +145,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_sym_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_sym_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             8,
             c"named-sym-lib.so".as_ptr(),
             c"bad sym".as_ptr(),
@@ -177,7 +169,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_func_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_addr_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             8,
             c"named-hook-lib.so".as_ptr(),
             c"named_target_hook".as_ptr(),
@@ -188,11 +180,11 @@ pub(super) fn run() {
         "hook_addr_flags check failed"
     );
     let target_fn: extern "C" fn(i64, i64) -> i64 =
-        unsafe { core::mem::transmute(capi_intercept_target as *const c_void) };
+        unsafe { mem::transmute(capi_intercept_target as *const c_void) };
     assert_eq!(target_fn(7, 8), 715, "hook_addr_flags check failed");
     let rec_named_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!rec_named_ptr.is_null(), "hook_addr_flags check failed");
-    let rec_named = unsafe { core::ffi::CStr::from_ptr(rec_named_ptr) }
+    let rec_named = unsafe { CStr::from_ptr(rec_named_ptr) }
         .to_str()
         .expect("hook records named utf8");
     assert!(
@@ -242,7 +234,7 @@ pub(super) fn run() {
         srx_inline_hook_hook_sym_addr_2(
             capi_intercept_target as *mut c_void,
             capi_hook_sym_replacement as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             8,
             c"named-sym-lib.so".as_ptr(),
             c"named_sym_addr_hook".as_ptr(),
@@ -255,7 +247,7 @@ pub(super) fn run() {
     assert_eq!(target_fn(9, 10), 919, "hook_addr_flags check failed");
     let rec_sym_ptr = unsafe { srx_inline_hook_get_records(0x7FF) };
     assert!(!rec_sym_ptr.is_null(), "hook_addr_flags check failed");
-    let rec_sym = unsafe { core::ffi::CStr::from_ptr(rec_sym_ptr) }
+    let rec_sym = unsafe { CStr::from_ptr(rec_sym_ptr) }
         .to_str()
         .expect("hook_sym_addr_2 records utf8");
     assert!(

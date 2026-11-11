@@ -1,7 +1,11 @@
 // SHARED stack API：递归默认抑制；allow_reentrant 后允许进入下一层
 
+#[cfg(target_arch = "x86_64")]
+use core::arch::global_asm;
 use core::ffi::c_void;
+use core::mem;
 use core::ptr;
+use std::hint;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
@@ -17,7 +21,7 @@ unsafe extern "C" {
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn stack_target(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 type AddFn = extern "C" fn(i64, i64) -> i64;
@@ -27,7 +31,7 @@ static EARLY_RETURN_ONCE: AtomicBool = AtomicBool::new(false);
 static SEEN_RETURN_ADDRESS: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(target_arch = "x86_64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl shared_stack_return_probe",
     ".type shared_stack_return_probe, @function",
     "shared_stack_return_probe:",
@@ -55,8 +59,8 @@ extern "C" fn stack_proxy(a: i64, b: i64) -> i64 {
 
     let stub = STUB_STACK.lock().expect("lock stack").expect("stub stack");
     let prev = unsafe { prev_func(stub).expect("prev stack") };
-    let prev_fn: AddFn = unsafe { core::mem::transmute(prev) };
-    let target_fn: AddFn = unsafe { core::mem::transmute(stack_target as *const c_void) };
+    let prev_fn: AddFn = unsafe { mem::transmute(prev) };
+    let target_fn: AddFn = unsafe { mem::transmute(stack_target as *const c_void) };
 
     if depth == 1 && EARLY_RETURN_ONCE.swap(false, Ordering::SeqCst) {
         unsafe { srx_inline_hook_pop_stack(return_address) };
@@ -101,11 +105,11 @@ pub fn shared_stack_api_basic() {
     .expect("shared_stack check failed");
     *STUB_STACK.lock().expect("lock stack") = Some(stub);
 
-    let target: AddFn = unsafe { core::mem::transmute(stack_target as *const c_void) };
+    let target: AddFn = unsafe { mem::transmute(stack_target as *const c_void) };
     #[cfg(target_arch = "x86_64")]
-    let probe: AddFn = unsafe { core::mem::transmute(shared_stack_return_probe as *const c_void) };
+    let probe: AddFn = unsafe { mem::transmute(shared_stack_return_probe as *const c_void) };
     #[cfg(target_arch = "x86_64")]
-    let probe_after_call = core::ptr::addr_of!(shared_stack_return_probe_after_call) as usize;
+    let probe_after_call = ptr::addr_of!(shared_stack_return_probe_after_call) as usize;
     #[cfg(target_arch = "x86_64")]
     assert_eq!(probe(3, 4), 67, "shared_stack check failed");
     #[cfg(target_arch = "x86_64")]

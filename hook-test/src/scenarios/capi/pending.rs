@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) fn run() {
-    CAPI_PENDING_ORIG.store(core::ptr::null_mut(), Ordering::SeqCst);
+    CAPI_PENDING_ORIG.store(ptr::null_mut(), Ordering::SeqCst);
     let pending_add_slot = CAPI_PENDING_ORIG.as_ptr() as *mut *mut c_void;
     let pending_stub = unsafe {
         srx_inline_hook_hook_sym_name(
@@ -30,7 +30,7 @@ pub(super) fn run() {
         !CAPI_PENDING_ORIG.load(Ordering::SeqCst).is_null(),
         "pending check failed"
     );
-    let add_fn: ProbeFn = unsafe { core::mem::transmute(add_ptr) };
+    let add_fn: ProbeFn = unsafe { mem::transmute(add_ptr) };
     assert_eq!(unsafe { add_fn(3, 4) }, 1007, "pending check failed");
     let pending_unhook = unsafe { srx_inline_hook_unhook(pending_stub) };
     assert_eq!(pending_unhook, 0, "pending check failed");
@@ -41,13 +41,13 @@ pub(super) fn run() {
     assert_eq!(unsafe { add_fn(3, 4) }, 7, "pending check failed");
     unsafe { libc::dlclose(pending_handle) };
 
-    CAPI_PENDING_ORIG.store(core::ptr::null_mut(), Ordering::SeqCst);
+    CAPI_PENDING_ORIG.store(ptr::null_mut(), Ordering::SeqCst);
     CAPI_PENDING_CB_HITS.store(0, Ordering::SeqCst);
     CAPI_PENDING_CB_ERR.store(-1, Ordering::SeqCst);
-    CAPI_PENDING_CB_SYM.store(core::ptr::null_mut(), Ordering::SeqCst);
-    CAPI_PENDING_CB_NEW_ADDR.store(core::ptr::null_mut(), Ordering::SeqCst);
-    CAPI_PENDING_CB_ARG.store(core::ptr::null_mut(), Ordering::Release);
-    CAPI_PENDING_CB_ORIG_ADDR.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_PENDING_CB_SYM.store(ptr::null_mut(), Ordering::SeqCst);
+    CAPI_PENDING_CB_NEW_ADDR.store(ptr::null_mut(), Ordering::SeqCst);
+    CAPI_PENDING_CB_ARG.store(ptr::null_mut(), Ordering::Release);
+    CAPI_PENDING_CB_ORIG_ADDR.store(ptr::null_mut(), Ordering::Release);
     *CAPI_PENDING_CB_LIB_NAME_TEXT
         .lock()
         .expect("reset pending cb lib") = None;
@@ -133,7 +133,7 @@ pub(super) fn run() {
         !CAPI_PENDING_CB_SYM.load(Ordering::SeqCst).is_null(),
         "pending check failed"
     );
-    let mul_fn: ProbeFn = unsafe { core::mem::transmute(mul_ptr) };
+    let mul_fn: ProbeFn = unsafe { mem::transmute(mul_ptr) };
     assert_eq!(unsafe { mul_fn(3, 4) }, 1012, "pending check failed");
     let pending_cb_unhook = unsafe { srx_inline_hook_unhook(pending_cb_stub) };
     assert_eq!(pending_cb_unhook, 0, "pending check failed");

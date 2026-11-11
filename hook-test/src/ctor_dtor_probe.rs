@@ -1,10 +1,13 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
+#[cfg(target_os = "android")]
+use core::arch::global_asm;
 use core::ffi::{c_int, c_void};
+use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(all(target_os = "android", target_arch = "x86_64"))]
-core::arch::global_asm!(
+global_asm!(
     ".pushsection .data,\"aw\",@progbits",
     ".balign 8",
     ".local ctor_dtor_probe_symtab_only",
@@ -16,7 +19,7 @@ core::arch::global_asm!(
 );
 
 #[cfg(all(target_os = "android", target_arch = "aarch64"))]
-core::arch::global_asm!(
+global_asm!(
     ".pushsection .data,\"aw\",@progbits",
     ".balign 8",
     ".local ctor_dtor_probe_symtab_only",
@@ -79,10 +82,10 @@ pub extern "C" fn ctor_dtor_probe_dtor_hits() -> usize {
 pub extern "C" fn ctor_dtor_probe_symtab_only_addr() -> *mut c_void {
     #[cfg(target_os = "android")]
     {
-        core::ptr::addr_of!(ctor_dtor_probe_symtab_only) as *mut c_void
+        ptr::addr_of!(ctor_dtor_probe_symtab_only) as *mut c_void
     }
     #[cfg(not(target_os = "android"))]
     {
-        core::ptr::addr_of!(CTOR_DTOR_PROBE_SYMTAB_ONLY_HOST) as *mut c_void
+        ptr::addr_of!(CTOR_DTOR_PROBE_SYMTAB_ONLY_HOST) as *mut c_void
     }
 }

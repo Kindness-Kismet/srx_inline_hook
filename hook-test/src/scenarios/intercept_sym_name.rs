@@ -2,6 +2,8 @@
 // 先覆盖已加载 so 成功路径与 unintercept 收尾
 
 use core::ffi::{c_char, c_int, c_void};
+use core::mem;
+use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use srx_inline_hook::{active_hook_count, diagnose, list_hooks, trampoline_stats};
@@ -71,14 +73,14 @@ pub fn intercept_sym_name_basic() {
         println!("intercept_sym_name_basic: skipped");
         return;
     }
-    let strlen_fn: StrlenFn = unsafe { core::mem::transmute(strlen_ptr) };
+    let strlen_fn: StrlenFn = unsafe { mem::transmute(strlen_ptr) };
 
     let stub = unsafe {
         srx_inline_hook_intercept_sym_name(
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -315,7 +317,7 @@ pub fn intercept_sym_name_pending_basic() {
             c"libctor_dtor_probe.so".as_ptr(),
             c"ctor_dtor_probe_add".as_ptr(),
             pre_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -332,7 +334,7 @@ pub fn intercept_sym_name_pending_basic() {
     type AddFn = unsafe extern "C" fn(c_int, c_int) -> c_int;
     let add_ptr = unsafe { libc::dlsym(handle, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!add_ptr.is_null(), "intercept_sym_name check failed");
-    let add_fn: AddFn = unsafe { core::mem::transmute(add_ptr) };
+    let add_fn: AddFn = unsafe { mem::transmute(add_ptr) };
     let v = unsafe { add_fn(3, 4) };
     assert_eq!(v, 7, "intercept_sym_name check failed");
     assert_eq!(
@@ -388,7 +390,7 @@ pub fn intercept_sym_name_pending_callback_basic() {
     type AddFn = unsafe extern "C" fn(c_int, c_int) -> c_int;
     let add_ptr = unsafe { libc::dlsym(handle, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!add_ptr.is_null(), "intercept_sym_name check failed");
-    let add_fn: AddFn = unsafe { core::mem::transmute(add_ptr) };
+    let add_fn: AddFn = unsafe { mem::transmute(add_ptr) };
     let v = unsafe { add_fn(8, 9) };
     assert_eq!(v, 17, "intercept_sym_name check failed");
     assert_eq!(
@@ -477,8 +479,7 @@ pub fn intercept_sym_name_pending_reopen_basic() {
     assert!(!handle1.is_null(), "intercept_sym_name check failed");
     let add_ptr1 = unsafe { libc::dlsym(handle1, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!add_ptr1.is_null(), "intercept_sym_name check failed");
-    let add_fn1: unsafe extern "C" fn(c_int, c_int) -> c_int =
-        unsafe { core::mem::transmute(add_ptr1) };
+    let add_fn1: unsafe extern "C" fn(c_int, c_int) -> c_int = unsafe { mem::transmute(add_ptr1) };
     assert_eq!(
         unsafe { add_fn1(3, 4) },
         7,
@@ -532,8 +533,7 @@ pub fn intercept_sym_name_pending_reopen_basic() {
     assert!(!handle2.is_null(), "intercept_sym_name check failed");
     let add_ptr2 = unsafe { libc::dlsym(handle2, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!add_ptr2.is_null(), "intercept_sym_name check failed");
-    let add_fn2: unsafe extern "C" fn(c_int, c_int) -> c_int =
-        unsafe { core::mem::transmute(add_ptr2) };
+    let add_fn2: unsafe extern "C" fn(c_int, c_int) -> c_int = unsafe { mem::transmute(add_ptr2) };
     assert_eq!(
         unsafe { add_fn2(8, 9) },
         17,

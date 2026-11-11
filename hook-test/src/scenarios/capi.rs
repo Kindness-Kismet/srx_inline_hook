@@ -1,8 +1,14 @@
 // C FFI 契约检查：extern 声明调用本 crate 导出的符号，验证可链接
 // 按 API 域拆分场景，覆盖状态、hook、intercept、记录与头文件契约
 
+use core::arch::global_asm;
 use core::ffi::{c_char, c_int, c_void};
+use core::mem;
+use core::ptr;
+use core::slice;
+use core::str;
 use core::sync::atomic::{AtomicI32, AtomicPtr, AtomicU32, Ordering};
+use std::hint;
 use std::sync::Mutex;
 
 type HookedFn = extern "C" fn(
@@ -163,44 +169,44 @@ type ProbeFn = unsafe extern "C" fn(c_int, c_int) -> c_int;
 fn copy_c_string(ptr: *const c_char) -> String {
     let mut len = 0usize;
     loop {
-        let ch = unsafe { core::ptr::read_volatile(ptr.add(len)) };
+        let ch = unsafe { ptr::read_volatile(ptr.add(len)) };
         if ch == 0 {
             break;
         }
         len += 1;
     }
-    let bytes = unsafe { core::slice::from_raw_parts(ptr as *const u8, len) };
-    core::str::from_utf8(bytes)
+    let bytes = unsafe { slice::from_raw_parts(ptr as *const u8, len) };
+    str::from_utf8(bytes)
         .expect("callback string utf8")
         .to_owned()
 }
 
-static mut CAPI_STUB: *mut c_void = core::ptr::null_mut();
+static mut CAPI_STUB: *mut c_void = ptr::null_mut();
 static CAPI_INTERCEPT_CB_HITS: AtomicI32 = AtomicI32::new(0);
 // 记录 capi_hooked_cb 收到的 orig_addr 值，供上层断言与用户传入的 slot 地址一致
-static CAPI_CB_ORIG_ADDR: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_CB_SYM: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_CB_NEW_ADDR: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static CAPI_CB_ORIG_ADDR: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_CB_SYM: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_CB_NEW_ADDR: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static CAPI_CB_LIB_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
 static CAPI_CB_SYM_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
-static CAPI_INTERCEPT_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static CAPI_INTERCEPT_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static CAPI_INTERCEPT_CB_LIB_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
 static CAPI_INTERCEPT_CB_SYM_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
-static CAPI_PENDING_ORIG: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static CAPI_PENDING_ORIG: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static CAPI_PENDING_CB_HITS: AtomicU32 = AtomicU32::new(0);
 static CAPI_PENDING_CB_ERR: AtomicI32 = AtomicI32::new(-1);
-static CAPI_PENDING_CB_SYM: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_PENDING_CB_NEW_ADDR: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_PENDING_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
-static CAPI_PENDING_CB_ORIG_ADDR: AtomicPtr<c_void> = AtomicPtr::new(core::ptr::null_mut());
+static CAPI_PENDING_CB_SYM: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_PENDING_CB_NEW_ADDR: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_PENDING_CB_ARG: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
+static CAPI_PENDING_CB_ORIG_ADDR: AtomicPtr<c_void> = AtomicPtr::new(ptr::null_mut());
 static CAPI_PENDING_CB_LIB_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
 static CAPI_PENDING_CB_SYM_NAME_TEXT: Mutex<Option<String>> = Mutex::new(None);
 
 extern "C" fn replacement_capi_strlen(s: *const c_char) -> usize {
     let prev = unsafe { srx_inline_hook_get_prev_func(replacement_capi_strlen as *mut c_void) };
     // SAFETY: 跳板 ABI 与 strlen 一致
-    let prev_fn: StrlenFn = unsafe { core::mem::transmute(prev) };
+    let prev_fn: StrlenFn = unsafe { mem::transmute(prev) };
     // SAFETY: s 由调用方保证 NUL 终止
     unsafe { prev_fn(s) + 500 }
 }
@@ -208,13 +214,13 @@ extern "C" fn replacement_capi_strlen(s: *const c_char) -> usize {
 #[unsafe(no_mangle)]
 #[inline(never)]
 extern "C" fn capi_intercept_target(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a).wrapping_add(std::hint::black_box(b))
+    hint::black_box(a).wrapping_add(hint::black_box(b))
 }
 
 extern "C" fn capi_intercept_pre(_ctx: *mut c_void, _data: *mut c_void) {}
 
 #[cfg(target_arch = "x86_64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl capi_overlap_a",
     ".type capi_overlap_a, @function",
     "capi_overlap_a:",
@@ -242,7 +248,7 @@ core::arch::global_asm!(
 );
 
 #[cfg(target_arch = "aarch64")]
-core::arch::global_asm!(
+global_asm!(
     ".globl capi_overlap_a",
     ".type capi_overlap_a, %function",
     "capi_overlap_a:",
@@ -270,14 +276,14 @@ extern "C" fn capi_overlap_replacement() -> i64 {
 }
 
 extern "C" fn capi_hook_addr_replacement(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a)
-        .wrapping_add(std::hint::black_box(b))
+    hint::black_box(a)
+        .wrapping_add(hint::black_box(b))
         .wrapping_add(700)
 }
 
 extern "C" fn capi_hook_sym_replacement(a: i64, b: i64) -> i64 {
-    std::hint::black_box(a)
-        .wrapping_add(std::hint::black_box(b))
+    hint::black_box(a)
+        .wrapping_add(hint::black_box(b))
         .wrapping_add(900)
 }
 
@@ -317,7 +323,7 @@ extern "C" fn capi_pending_replacement(a: c_int, b: c_int) -> c_int {
     if p.is_null() {
         return -1;
     }
-    let orig: ProbeFn = unsafe { core::mem::transmute(p) };
+    let orig: ProbeFn = unsafe { mem::transmute(p) };
     unsafe { orig(a, b) + 1000 }
 }
 
@@ -376,7 +382,7 @@ extern "C" fn capi_intercepted_cb(
     } else {
         Some(copy_c_string(sym_name))
     };
-    CAPI_INTERCEPT_CB_HITS.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+    CAPI_INTERCEPT_CB_HITS.fetch_add(1, Ordering::SeqCst);
 }
 
 #[path = "capi/callback_contract.rs"]

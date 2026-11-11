@@ -2,6 +2,7 @@
 // 与 hook_with_orig 等价，差异仅在 RecordOp 标签便于诊断区分
 
 use core::ffi::c_void;
+use core::mem;
 use core::ptr;
 
 use srx_inline_hook::{
@@ -47,7 +48,7 @@ pub fn hook_sym_addr_basic() {
     // SAFETY: stub 有效
     let prev = unsafe { prev_func(stub).expect("prev") };
     // SAFETY: ABI 与 target_add 一致
-    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { core::mem::transmute(prev) };
+    let prev_fn: extern "C" fn(i64, i64) -> i64 = unsafe { mem::transmute(prev) };
     assert_eq!(prev_fn(3, 4), 7, "sym_addr check failed");
 
     // SAFETY: stub 有效

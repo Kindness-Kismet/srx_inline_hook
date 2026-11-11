@@ -2,6 +2,7 @@
 // 从 Android 模块抽离可测逻辑
 
 use core::ffi::{CStr, c_char, c_int};
+use core::slice;
 
 // 取路径文件名；无分隔符整段原样返回，尾斜杠视作空名返回原串
 pub fn basename_of(path: &str) -> &str {
@@ -39,6 +40,6 @@ pub unsafe fn cstr_from_ptr_no_libc<'a>(ptr: *const c_char) -> Option<&'a CStr> 
     }
     // SAFETY: 上面已找到 NUL 终止，长度覆盖 ptr..=ptr+len
     Some(unsafe {
-        CStr::from_bytes_with_nul_unchecked(core::slice::from_raw_parts(ptr.cast::<u8>(), len + 1))
+        CStr::from_bytes_with_nul_unchecked(slice::from_raw_parts(ptr.cast::<u8>(), len + 1))
     })
 }

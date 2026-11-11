@@ -1,3 +1,6 @@
+use core::ffi::CStr;
+use std::thread;
+
 use super::*;
 
 pub(super) fn run() {
@@ -7,7 +10,7 @@ pub(super) fn run() {
     assert!(!strlen_handle.is_null(), "lookup_flags check failed");
     let strlen_ptr = unsafe { libc::dlsym(strlen_handle, sym_name.as_ptr()) };
     assert!(!strlen_ptr.is_null(), "lookup_flags check failed");
-    let mut strlen_info: libc::Dl_info = unsafe { core::mem::zeroed() };
+    let mut strlen_info: libc::Dl_info = unsafe { mem::zeroed() };
     assert_ne!(
         unsafe { libc::dladdr(strlen_ptr, &mut strlen_info) },
         0,
@@ -17,10 +20,10 @@ pub(super) fn run() {
         !strlen_info.dli_fname.is_null(),
         "lookup_flags check failed"
     );
-    let libc_path = unsafe { core::ffi::CStr::from_ptr(strlen_info.dli_fname) };
+    let libc_path = unsafe { CStr::from_ptr(strlen_info.dli_fname) };
     // 7) 新线程未调任何 API 时 _get_errno() 返回 0
     //    pthread_getspecific 未 set 时返 NULL → 0 的语义
-    let fresh_errno = std::thread::spawn(|| {
+    let fresh_errno = thread::spawn(|| {
         // SAFETY: get_errno 只读线程局部槽
         unsafe { srx_inline_hook_get_errno() }
     })
@@ -50,8 +53,7 @@ pub(super) fn run() {
         srx_inline_hook_dlsym(probe_handle, c"ctor_dtor_probe_symtab_only_addr".as_ptr())
     };
     assert!(!probe_helper.is_null(), "lookup_flags check failed");
-    let probe_helper_fn: extern "C" fn() -> *mut c_void =
-        unsafe { core::mem::transmute(probe_helper) };
+    let probe_helper_fn: extern "C" fn() -> *mut c_void = unsafe { mem::transmute(probe_helper) };
     let probe_symtab_expected = probe_helper_fn();
     assert!(
         !probe_symtab_expected.is_null(),
@@ -93,10 +95,10 @@ pub(super) fn run() {
     }
 
     // SAFETY: NULL handle 短路
-    let null_sym = unsafe { srx_inline_hook_dlsym(core::ptr::null_mut(), sym_name.as_ptr()) };
+    let null_sym = unsafe { srx_inline_hook_dlsym(ptr::null_mut(), sym_name.as_ptr()) };
     assert!(null_sym.is_null(), "lookup_flags check failed");
     // SAFETY: NULL lib_name 短路
-    let null_h = unsafe { srx_inline_hook_dlopen(core::ptr::null()) };
+    let null_h = unsafe { srx_inline_hook_dlopen(ptr::null()) };
     assert!(null_h.is_null(), "lookup_flags check failed");
     // SAFETY: handle 来自 _dlopen
     unsafe {
@@ -112,7 +114,7 @@ pub(super) fn run() {
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             1, // SRX_INLINE_HOOK_HOOK_WITH_SHARED_MODE
         )
     };
@@ -129,7 +131,7 @@ pub(super) fn run() {
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             4, // SRX_INLINE_HOOK_HOOK_WITH_MULTI_MODE
         )
     };
@@ -139,7 +141,7 @@ pub(super) fn run() {
         3,
         "lookup_flags check failed"
     );
-    let mut multi_orig = core::ptr::null_mut();
+    let mut multi_orig = ptr::null_mut();
     let multi_stub = unsafe {
         srx_inline_hook_hook_sym_name_2(
             libc_name.as_ptr(),
@@ -166,7 +168,7 @@ pub(super) fn run() {
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0x100,
         )
     };
@@ -182,7 +184,7 @@ pub(super) fn run() {
             libc_name.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -194,14 +196,14 @@ pub(super) fn run() {
         let probe_h = c"flag2";
         // SAFETY: strlen_ptr 指向 libc
         let _ = unsafe {
-            let f: StrlenFn = core::mem::transmute(strlen_ptr);
+            let f: StrlenFn = mem::transmute(strlen_ptr);
             f(probe_h.as_ptr())
         };
         // SAFETY: stub 有效
         let urc = unsafe { srx_inline_hook_unhook(ok_stub) };
         assert_eq!(urc, 0, "lookup_flags check failed");
         unsafe {
-            CAPI_STUB = core::ptr::null_mut();
+            CAPI_STUB = ptr::null_mut();
         }
     }
 
@@ -210,7 +212,7 @@ pub(super) fn run() {
             libc_path.as_ptr(),
             sym_name.as_ptr(),
             replacement_capi_strlen as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -222,14 +224,14 @@ pub(super) fn run() {
     );
     let path_probe = c"path";
     let path_hooked_len = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(path_probe.as_ptr())
     };
     assert_eq!(path_hooked_len, 4 + 500, "lookup_flags check failed");
     let path_unhook = unsafe { srx_inline_hook_unhook(path_stub) };
     assert_eq!(path_unhook, 0, "lookup_flags check failed");
     let restored_len = unsafe {
-        let f: StrlenFn = core::mem::transmute(strlen_ptr);
+        let f: StrlenFn = mem::transmute(strlen_ptr);
         f(path_probe.as_ptr())
     };
     assert_eq!(restored_len, 4, "lookup_flags check failed");

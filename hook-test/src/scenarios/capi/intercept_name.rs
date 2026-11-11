@@ -1,3 +1,5 @@
+use core::ffi::CStr;
+
 use super::*;
 
 pub(super) fn run() {
@@ -6,7 +8,7 @@ pub(super) fn run() {
             c"libctor_dtor_probe.so".as_ptr(),
             c"ctor_dtor_probe_add".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -28,7 +30,7 @@ pub(super) fn run() {
     let pending_add_ptr =
         unsafe { libc::dlsym(pending_intercept_handle, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!pending_add_ptr.is_null(), "intercept_name check failed");
-    let pending_add_fn: ProbeFn = unsafe { core::mem::transmute(pending_add_ptr) };
+    let pending_add_fn: ProbeFn = unsafe { mem::transmute(pending_add_ptr) };
     assert_eq!(
         unsafe { pending_add_fn(3, 4) },
         7,
@@ -39,7 +41,7 @@ pub(super) fn run() {
     unsafe { libc::dlclose(pending_intercept_handle) };
 
     CAPI_INTERCEPT_CB_HITS.store(0, Ordering::SeqCst);
-    CAPI_INTERCEPT_CB_ARG.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_INTERCEPT_CB_ARG.store(ptr::null_mut(), Ordering::Release);
     *CAPI_INTERCEPT_CB_LIB_NAME_TEXT
         .lock()
         .expect("reset pending intercept cb lib") = None;
@@ -53,7 +55,7 @@ pub(super) fn run() {
             c"./libctor_dtor_probe.so".as_ptr(),
             c"ctor_dtor_probe_add".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
             capi_intercepted_cb as *mut c_void,
             pending_intercept_cb_arg,
@@ -82,7 +84,7 @@ pub(super) fn run() {
     let pending_add_ptr2 =
         unsafe { libc::dlsym(pending_intercept_handle2, c"ctor_dtor_probe_add".as_ptr()) };
     assert!(!pending_add_ptr2.is_null(), "intercept_name check failed");
-    let pending_add_fn2: ProbeFn = unsafe { core::mem::transmute(pending_add_ptr2) };
+    let pending_add_fn2: ProbeFn = unsafe { mem::transmute(pending_add_ptr2) };
     assert_eq!(
         unsafe { pending_add_fn2(8, 9) },
         17,
@@ -130,10 +132,10 @@ pub(super) fn run() {
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0x100,
             capi_intercepted_cb as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(bad_intercept_cb.is_null(), "intercept_name check failed");
@@ -143,7 +145,7 @@ pub(super) fn run() {
         "intercept_name check failed"
     );
     assert_eq!(
-        CAPI_INTERCEPT_CB_HITS.load(core::sync::atomic::Ordering::SeqCst),
+        CAPI_INTERCEPT_CB_HITS.load(Ordering::SeqCst),
         0,
         "intercept_name check failed"
     );
@@ -153,7 +155,7 @@ pub(super) fn run() {
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -178,7 +180,7 @@ pub(super) fn run() {
         !intercept_unrec_ptr.is_null(),
         "intercept_name check failed"
     );
-    let intercept_unrec = unsafe { core::ffi::CStr::from_ptr(intercept_unrec_ptr) }
+    let intercept_unrec = unsafe { CStr::from_ptr(intercept_unrec_ptr) }
         .to_str()
         .expect("intercept records utf8");
     assert!(
@@ -195,7 +197,7 @@ pub(super) fn run() {
     assert!(!strlen_handle.is_null(), "intercept_name check failed");
     let strlen_ptr = unsafe { libc::dlsym(strlen_handle, c"strlen".as_ptr()) };
     assert!(!strlen_ptr.is_null(), "intercept_name check failed");
-    let mut strlen_info: libc::Dl_info = unsafe { core::mem::zeroed() };
+    let mut strlen_info: libc::Dl_info = unsafe { mem::zeroed() };
     assert_ne!(
         unsafe { libc::dladdr(strlen_ptr, &mut strlen_info) },
         0,
@@ -205,14 +207,14 @@ pub(super) fn run() {
         !strlen_info.dli_fname.is_null(),
         "intercept_name check failed"
     );
-    let libc_path = unsafe { core::ffi::CStr::from_ptr(strlen_info.dli_fname) };
+    let libc_path = unsafe { CStr::from_ptr(strlen_info.dli_fname) };
 
     let intercept_path_stub = unsafe {
         srx_inline_hook_intercept_sym_name(
             libc_path.as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
         )
     };
@@ -228,8 +230,8 @@ pub(super) fn run() {
     let intercept_path_unhook = unsafe { srx_inline_hook_unintercept(intercept_path_stub) };
     assert_eq!(intercept_path_unhook, 0, "intercept_name check failed");
 
-    CAPI_INTERCEPT_CB_HITS.store(0, core::sync::atomic::Ordering::SeqCst);
-    CAPI_INTERCEPT_CB_ARG.store(core::ptr::null_mut(), Ordering::Release);
+    CAPI_INTERCEPT_CB_HITS.store(0, Ordering::SeqCst);
+    CAPI_INTERCEPT_CB_ARG.store(ptr::null_mut(), Ordering::Release);
     *CAPI_INTERCEPT_CB_LIB_NAME_TEXT
         .lock()
         .expect("reset intercept cb lib") = None;
@@ -243,7 +245,7 @@ pub(super) fn run() {
             libc_path.as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
             capi_intercepted_cb as *mut c_void,
             intercept_cb_arg,
@@ -256,7 +258,7 @@ pub(super) fn run() {
         "intercept_name check failed"
     );
     assert_eq!(
-        CAPI_INTERCEPT_CB_HITS.load(core::sync::atomic::Ordering::SeqCst),
+        CAPI_INTERCEPT_CB_HITS.load(Ordering::SeqCst),
         1,
         "intercept_name check failed"
     );
@@ -281,13 +283,13 @@ pub(super) fn run() {
         intercept_cb_arg,
         "intercept_name check failed"
     );
-    CAPI_INTERCEPT_CB_HITS.store(0, core::sync::atomic::Ordering::SeqCst);
+    CAPI_INTERCEPT_CB_HITS.store(0, Ordering::SeqCst);
     let intercept_cb_dup = unsafe {
         srx_inline_hook_intercept_sym_name_callback(
             libc_path.as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
             capi_intercepted_cb as *mut c_void,
             intercept_cb_arg,
@@ -300,7 +302,7 @@ pub(super) fn run() {
         "intercept_name check failed"
     );
     assert_eq!(
-        CAPI_INTERCEPT_CB_HITS.load(core::sync::atomic::Ordering::SeqCst),
+        CAPI_INTERCEPT_CB_HITS.load(Ordering::SeqCst),
         1,
         "intercept_name check failed"
     );
@@ -312,16 +314,16 @@ pub(super) fn run() {
         "intercept_name check failed"
     );
 
-    CAPI_INTERCEPT_CB_HITS.store(0, core::sync::atomic::Ordering::SeqCst);
+    CAPI_INTERCEPT_CB_HITS.store(0, Ordering::SeqCst);
     let intercept_cb_null = unsafe {
         srx_inline_hook_intercept_sym_name_callback(
             c"libc.so".as_ptr(),
             c"strlen".as_ptr(),
             capi_intercept_pre as *mut c_void,
-            core::ptr::null_mut(),
+            ptr::null_mut(),
             0,
-            core::ptr::null_mut(),
-            core::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
         )
     };
     assert!(!intercept_cb_null.is_null(), "intercept_name check failed");
@@ -331,7 +333,7 @@ pub(super) fn run() {
         "intercept_name check failed"
     );
     assert_eq!(
-        CAPI_INTERCEPT_CB_HITS.load(core::sync::atomic::Ordering::SeqCst),
+        CAPI_INTERCEPT_CB_HITS.load(Ordering::SeqCst),
         0,
         "intercept_name check failed"
     );
@@ -340,7 +342,7 @@ pub(super) fn run() {
 
     // unintercept(NULL)：返 -1 + InvalidArg(3)
     // SAFETY: NULL 走 InvalidArg 分支
-    let ui_null = unsafe { srx_inline_hook_unintercept(core::ptr::null_mut()) };
+    let ui_null = unsafe { srx_inline_hook_unintercept(ptr::null_mut()) };
     assert_eq!(ui_null, -1);
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 3);
     // unintercept(非 NULL)：当前最小实现下，未知 stub 返 -1 + UnhookNotFound(27)

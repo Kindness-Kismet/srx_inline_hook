@@ -2,6 +2,7 @@
 // 句柄仍走 HookStub.handle；已完成任务复用 active_stub，未完成任务保留 pending id
 
 use core::ffi::{CStr, c_void};
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use std::collections::HashMap;
@@ -304,7 +305,7 @@ fn install_pending(id: usize, info: *mut libc::dl_phdr_info, _size: usize) -> Re
             )
         },
         PendingTaskKind::Intercept => {
-            let pre: Interceptor = unsafe { core::mem::transmute(snapshot.replacement) };
+            let pre: Interceptor = unsafe { mem::transmute(snapshot.replacement) };
             let data = snapshot.data as *mut c_void;
             let stub = api::intercept_addr_impl(sym, pre, data, snapshot.flags)?;
             Ok((stub, 0))
@@ -389,7 +390,7 @@ fn run_pending_callback(task: &PendingTask, error: i32, sym_addr: *const c_void)
             let Some(cb) = task.intercepted else {
                 return;
             };
-            let pre: Interceptor = unsafe { core::mem::transmute(task.replacement) };
+            let pre: Interceptor = unsafe { mem::transmute(task.replacement) };
             cb(
                 error,
                 cbytes(&task.lib_name).as_ptr(),

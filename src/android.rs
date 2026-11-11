@@ -1,6 +1,9 @@
 // 封装 Android 侧内存页权限翻转、页大小查询与指令缓存刷新
 
 use core::ffi::{CStr, c_char, c_int, c_void};
+use core::ptr;
+use core::str;
+
 use once_cell::sync::OnceCell;
 
 use crate::errno::Errno;
@@ -72,7 +75,7 @@ pub fn device_api_level() -> i32 {
         if len <= 0 {
             return 0;
         }
-        core::str::from_utf8(&buf[..len as usize])
+        str::from_utf8(&buf[..len as usize])
             .ok()
             .and_then(|s| s.parse::<i32>().ok())
             .unwrap_or(0)
@@ -156,7 +159,7 @@ pub unsafe fn write_inst(target: *mut u8, bytes: &[u8]) -> bool {
 
     // 退化 memcpy：x86_64 14B 路径、arm64 非 16B 对齐路径走这里
     // SAFETY: 调用方已 mprotect RWX；上层 guard 捕获信号
-    unsafe { core::ptr::copy_nonoverlapping(bytes.as_ptr(), target, len) };
+    unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), target, len) };
     false
 }
 

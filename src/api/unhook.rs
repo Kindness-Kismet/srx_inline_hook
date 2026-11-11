@@ -1,3 +1,6 @@
+use core::sync::atomic;
+use core::sync::atomic::Ordering;
+
 use super::prelude::*;
 
 pub(crate) unsafe fn unhook_active(stub: HookStub, caller_addr: usize) -> Result<(), Errno> {
@@ -191,7 +194,7 @@ unsafe fn unhook_finalize(sw: Switch) -> Result<(), Errno> {
             android::mprotect_rx(target_ptr, sw.original.len())?;
             android::clear_icache(target_ptr, sw.original.len());
             // SEQ_CST fence：arm64 clear_icache 已含，x86_64 显式补一次
-            core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+            atomic::fence(Ordering::SeqCst);
             Ok(())
         })
     };
@@ -235,7 +238,7 @@ unsafe fn repatch_head(target_ptr: *mut u8, new_head: *const c_void) -> Result<(
             android::write_inst(target_ptr, &patch);
             android::mprotect_rx(target_ptr, current::MIN_OVERWRITE_LEN)?;
             android::clear_icache(target_ptr, current::MIN_OVERWRITE_LEN);
-            core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+            atomic::fence(Ordering::SeqCst);
             Ok(())
         })
     };

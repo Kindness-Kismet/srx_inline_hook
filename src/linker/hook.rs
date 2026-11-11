@@ -1,3 +1,5 @@
+use core::mem;
+
 use super::prelude::*;
 
 const LINKER_SYM_CALL_CONSTRUCTORS_M: &CStr = c"__dl__ZN6soinfo17call_constructorsEv";
@@ -178,7 +180,7 @@ fn call_prev_soinfo(stub: *mut c_void, soinfo: *mut c_void) {
         return;
     };
     // SAFETY: prev_func 返回 trampoline，ABI 与 soinfo 成员函数保持单参调用约定
-    let orig: extern "C" fn(*mut c_void) = unsafe { core::mem::transmute(prev) };
+    let orig: extern "C" fn(*mut c_void) = unsafe { mem::transmute(prev) };
     orig(soinfo);
 }
 

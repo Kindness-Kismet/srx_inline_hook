@@ -1,11 +1,15 @@
 use core::ffi::{c_int, c_void};
+use core::mem;
 use core::ptr;
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
-use once_cell::sync::{Lazy, OnceCell};
 use std::sync::Mutex;
+
+use once_cell::sync::{Lazy, OnceCell};
 
 use crate::errno::Errno;
 use crate::linker::{LoadedSymbolLookup, find_loaded_symbol};
+
+use super::handle_guard_signal;
 
 type Sigaction = unsafe extern "C" fn(c_int, *const libc::sigaction, *mut libc::sigaction) -> c_int;
 type Sigprocmask = unsafe extern "C" fn(c_int, *const libc::sigset_t, *mut libc::sigset_t) -> c_int;
@@ -53,9 +57,9 @@ fn resolve_api() -> Result<SignalApi, Errno> {
         LoadedSymbolLookup::SymNotFound => return Err(Errno::InitSafe),
     };
     Ok(SignalApi {
-        register: unsafe { core::mem::transmute::<*mut c_void, Sigaction>(register) },
-        kernel_action: unsafe { core::mem::transmute::<*mut c_void, Sigaction>(action) },
-        kernel_mask: unsafe { core::mem::transmute::<*mut c_void, Sigprocmask>(mask) },
+        register: unsafe { mem::transmute::<*mut c_void, Sigaction>(register) },
+        kernel_action: unsafe { mem::transmute::<*mut c_void, Sigaction>(action) },
+        kernel_mask: unsafe { mem::transmute::<*mut c_void, Sigprocmask>(mask) },
     })
 }
 
@@ -83,11 +87,11 @@ pub fn init() -> Result<(), Errno> {
 }
 
 unsafe fn install(api: &SignalApi, signum: c_int, state: &SignalState) -> Result<(), ()> {
-    let mut previous = Box::new(core::mem::zeroed::<libc::sigaction>());
+    let mut previous = Box::new(mem::zeroed::<libc::sigaction>());
     if (api.register)(signum, ptr::null(), &mut *previous) != 0 {
         return Err(());
     }
-    let mut action: libc::sigaction = core::mem::zeroed();
+    let mut action: libc::sigaction = mem::zeroed();
     libc::sigfillset(&mut action.sa_mask);
     const SA_EXPOSE_TAGBITS: c_int = 0x800;
     action.sa_flags = libc::SA_SIGINFO
@@ -102,7 +106,7 @@ unsafe fn install(api: &SignalApi, signum: c_int, state: &SignalState) -> Result
     state
         .previous
         .store(Box::into_raw(previous), Ordering::Release);
-    let mut replaced = Box::new(core::mem::zeroed::<libc::sigaction>());
+    let mut replaced = Box::new(mem::zeroed::<libc::sigaction>());
     if (api.register)(signum, &action, &mut *replaced) != 0 {
         return Err(());
     }
@@ -114,7 +118,7 @@ unsafe fn install(api: &SignalApi, signum: c_int, state: &SignalState) -> Result
 }
 
 unsafe extern "C" fn handler(signum: c_int, info: *mut libc::siginfo_t, context: *mut c_void) {
-    super::handle_guard_signal(signum, info);
+    handle_guard_signal(signum, info);
     let state = match signum {
         libc::SIGSEGV => &SEGV,
         libc::SIGBUS => &BUS,
@@ -149,7 +153,7 @@ unsafe fn forward(
     let mut mask = ptr::addr_of!((*(context as *const libc::ucontext_t)).uc_sigmask64)
         .cast::<libc::sigset_t>()
         .read();
-    for signal in 1..=(core::mem::size_of::<libc::sigset_t>() * 8) as c_int {
+    for signal in 1..=(mem::size_of::<libc::sigset_t>() * 8) as c_int {
         if libc::sigismember(&previous.sa_mask, signal) == 1 {
             libc::sigaddset(&mut mask, signal);
         }
@@ -157,16 +161,16 @@ unsafe fn forward(
     if previous.sa_flags & libc::SA_NODEFER == 0 {
         libc::sigaddset(&mut mask, signum);
     }
-    let mut saved: libc::sigset_t = core::mem::zeroed();
+    let mut saved: libc::sigset_t = mem::zeroed();
     if (api.kernel_mask)(libc::SIG_SETMASK, &mask, &mut saved) != 0 {
         terminate(api, signum);
     }
     if previous.sa_flags & libc::SA_SIGINFO != 0 {
         let callback: unsafe extern "C" fn(c_int, *mut libc::siginfo_t, *mut c_void) =
-            core::mem::transmute(previous.sa_sigaction);
+            mem::transmute(previous.sa_sigaction);
         callback(signum, info, context);
     } else {
-        let callback: unsafe extern "C" fn(c_int) = core::mem::transmute(previous.sa_sigaction);
+        let callback: unsafe extern "C" fn(c_int) = mem::transmute(previous.sa_sigaction);
         callback(signum);
     }
     if (api.kernel_mask)(libc::SIG_SETMASK, &saved, ptr::null_mut()) != 0 {
@@ -175,9 +179,9 @@ unsafe fn forward(
 }
 
 unsafe fn terminate(api: &SignalApi, signum: c_int) -> ! {
-    let mut action: libc::sigaction = core::mem::zeroed();
+    let mut action: libc::sigaction = mem::zeroed();
     action.sa_sigaction = libc::SIG_DFL;
-    let mut mask: libc::sigset_t = core::mem::zeroed();
+    let mut mask: libc::sigset_t = mem::zeroed();
     libc::sigaddset(&mut mask, signum);
     if (api.kernel_action)(signum, &action, ptr::null_mut()) == 0
         && (api.kernel_mask)(libc::SIG_UNBLOCK, &mask, ptr::null_mut()) == 0
