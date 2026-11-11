@@ -6,13 +6,23 @@ pub(super) fn run() {
     // hook_func_addr_2 / sym_addr_2 flags 校验（固定 4 参签名）
     // SHARED_MODE + 无效 target：走 shared 安装主路径，rewriter 读 0x1 prologue 崩 → HookRewriteCrash(25)
     let f2_shared = unsafe {
-        srx_inline_hook_hook_func_addr_2(0x1 as *mut c_void, 0x2 as *mut c_void, ptr::null_mut(), 1)
+        srx_inline_hook_hook_func_addr_2(
+            ptr::dangling_mut::<c_void>(),
+            0x2 as *mut c_void,
+            ptr::null_mut(),
+            1,
+        )
     };
     assert!(f2_shared.is_null());
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 25);
     // MULTI + orig_addr=NULL：前置参数校验先拦截，应返回 InvalidArg(3)
     let s2_multi = unsafe {
-        srx_inline_hook_hook_sym_addr_2(0x1 as *mut c_void, 0x2 as *mut c_void, ptr::null_mut(), 4)
+        srx_inline_hook_hook_sym_addr_2(
+            ptr::dangling_mut::<c_void>(),
+            0x2 as *mut c_void,
+            ptr::null_mut(),
+            4,
+        )
     };
     assert!(s2_multi.is_null());
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 3);
@@ -20,7 +30,7 @@ pub(super) fn run() {
     // SAFETY: 同上
     let f2_bad = unsafe {
         srx_inline_hook_hook_func_addr_2(
-            0x1 as *mut c_void,
+            ptr::dangling_mut::<c_void>(),
             0x2 as *mut c_void,
             ptr::null_mut(),
             0x100,

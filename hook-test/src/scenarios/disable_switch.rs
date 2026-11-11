@@ -1,7 +1,7 @@
 // 全局禁用开关：开启后拒绝新 hook，已有 hook 保持生效
 // 关闭后恢复安装和卸载能力
 
-use core::ffi::{CStr, c_void};
+use core::ffi::c_void;
 use core::ptr;
 
 use srx_inline_hook::{Errno, hook_single, hook_sym_name, is_disabled, set_disabled, unhook};
@@ -23,8 +23,8 @@ pub fn global_disable_switch() {
     assert!(matches!(blocked, Err(Errno::Disabled)));
 
     // hook_sym_name 路径的 disabled 检查应在 dlopen 之前：即便参数合法也先返回 Disabled
-    let libc = CStr::from_bytes_with_nul(b"libc.so\0").unwrap();
-    let sym = CStr::from_bytes_with_nul(b"strlen\0").unwrap();
+    let libc = c"libc.so";
+    let sym = c"strlen";
     // SAFETY: libc.so / strlen 有效；disabled 下应在 dlopen 前返回
     let blocked_sn =
         unsafe { hook_sym_name(libc, sym, replacement_add as *const c_void, ptr::null_mut()) };

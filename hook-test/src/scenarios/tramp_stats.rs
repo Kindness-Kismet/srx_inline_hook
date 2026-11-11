@@ -48,7 +48,7 @@ pub fn trampoline_stats_basic() {
         "tramp_stats check failed"
     );
     assert!(
-        after_unhook.slots_cooldown >= before.slots_cooldown + 1,
+        after_unhook.slots_cooldown > before.slots_cooldown,
         "tramp_stats check failed: {:?}, {:?}",
         before,
         after_unhook

@@ -1,7 +1,7 @@
 // symbol_info 场景：验证 addr_info 能将地址定位到 so / 基址
 // bionic dladdr 对 sym_name 非强保证；细粒度符号需 ELF 解析
 
-use core::ffi::{CStr, c_void};
+use core::ffi::c_void;
 
 use srx_inline_hook::addr_info;
 
@@ -19,7 +19,7 @@ pub fn addr_info_basic() {
     );
 
     // libc 导出符号：dlsym(RTLD_DEFAULT, "strlen") 绕过 LLVM 内联
-    let name = CStr::from_bytes_with_nul(b"strlen\0").unwrap();
+    let name = c"strlen";
     // SAFETY: RTLD_DEFAULT 查找当前全局命名空间
     let strlen_addr = unsafe { libc::dlsym(libc::RTLD_DEFAULT, name.as_ptr()) };
     assert!(!strlen_addr.is_null(), "symbol_info check failed");

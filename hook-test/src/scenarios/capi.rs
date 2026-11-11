@@ -175,7 +175,7 @@ fn copy_c_string(ptr: *const c_char) -> String {
         }
         len += 1;
     }
-    let bytes = unsafe { slice::from_raw_parts(ptr as *const u8, len) };
+    let bytes = unsafe { slice::from_raw_parts(ptr.cast::<u8>(), len) };
     str::from_utf8(bytes)
         .expect("callback string utf8")
         .to_owned()

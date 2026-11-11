@@ -159,10 +159,10 @@ pub fn run_all() {
 }
 
 fn run(name: &str, scenario: fn()) {
-    if let Ok(filter) = env::var("HOOK_TEST_SCENARIO") {
-        if filter != name {
-            return;
-        }
+    if let Ok(filter) = env::var("HOOK_TEST_SCENARIO")
+        && filter != name
+    {
+        return;
     }
     scenario();
 }

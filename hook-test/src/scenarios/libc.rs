@@ -53,8 +53,8 @@ pub fn hook_libc_strlen() {
         ptr::copy_nonoverlapping(strlen_ptr as *const u8, buf.as_mut_ptr(), 24);
     }
     let mut hex = String::new();
-    for w in buf.chunks_exact(4) {
-        let v = u32::from_le_bytes([w[0], w[1], w[2], w[3]]);
+    for word in buf.as_chunks::<4>().0 {
+        let v = u32::from_le_bytes(*word);
         hex.push_str(&format!("{:08x} ", v));
     }
     println!(

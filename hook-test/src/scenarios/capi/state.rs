@@ -83,14 +83,14 @@ pub(super) fn run() {
         45,
         "state check failed"
     );
-    let disabled_unhook = unsafe { srx_inline_hook_unhook(0x1 as *mut c_void) };
+    let disabled_unhook = unsafe { srx_inline_hook_unhook(ptr::dangling_mut::<c_void>()) };
     assert_eq!(disabled_unhook, -1, "state check failed");
     assert_eq!(
         unsafe { srx_inline_hook_get_errno() },
         45,
         "state check failed"
     );
-    let disabled_unintercept = unsafe { srx_inline_hook_unintercept(0x1 as *mut c_void) };
+    let disabled_unintercept = unsafe { srx_inline_hook_unintercept(ptr::dangling_mut::<c_void>()) };
     assert_eq!(disabled_unintercept, -1, "state check failed");
     assert_eq!(
         unsafe { srx_inline_hook_get_errno() },

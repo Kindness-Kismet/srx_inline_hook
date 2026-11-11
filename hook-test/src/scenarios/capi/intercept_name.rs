@@ -346,7 +346,7 @@ pub(super) fn run() {
     assert_eq!(ui_null, -1);
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 3);
     // unintercept(非 NULL)：当前最小实现下，未知 stub 返 -1 + UnhookNotFound(27)
-    let ui_any = unsafe { srx_inline_hook_unintercept(0x1 as *mut c_void) };
+    let ui_any = unsafe { srx_inline_hook_unintercept(ptr::dangling_mut::<c_void>()) };
     assert_eq!(ui_any, -1);
     assert_eq!(unsafe { srx_inline_hook_get_errno() }, 27);
     unsafe { libc::dlclose(strlen_handle) };

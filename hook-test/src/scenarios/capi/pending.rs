@@ -2,7 +2,7 @@ use super::*;
 
 pub(super) fn run() {
     CAPI_PENDING_ORIG.store(ptr::null_mut(), Ordering::SeqCst);
-    let pending_add_slot = CAPI_PENDING_ORIG.as_ptr() as *mut *mut c_void;
+    let pending_add_slot = CAPI_PENDING_ORIG.as_ptr();
     let pending_stub = unsafe {
         srx_inline_hook_hook_sym_name(
             c"libctor_dtor_probe.so".as_ptr(),
