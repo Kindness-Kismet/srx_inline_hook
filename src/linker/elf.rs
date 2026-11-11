@@ -16,17 +16,18 @@ const SHN_LORESERVE: u16 = 0xff00;
 const SHN_HIRESERVE: u16 = 0xffff;
 const GNU_DEBUGDATA: &[u8] = b".gnu_debugdata";
 const SYMTAB_NAME: &[u8] = b".symtab";
+// 优先按当前链接器命名空间解析，绝对路径仅作后续候选。
 const LIBLZMA_PATHS_64: [&CStr; 4] = [
+    c"liblzma.so",
+    c"/system/lib64/liblzma.so",
     c"/apex/com.android.art/lib64/liblzma.so",
     c"/apex/com.android.runtime/lib64/liblzma.so",
-    c"/system/lib64/liblzma.so",
-    c"liblzma.so",
 ];
 const LIBLZMA_PATHS_32: [&CStr; 4] = [
+    c"liblzma.so",
+    c"/system/lib/liblzma.so",
     c"/apex/com.android.art/lib/liblzma.so",
     c"/apex/com.android.runtime/lib/liblzma.so",
-    c"/system/lib/liblzma.so",
-    c"liblzma.so",
 ];
 const LIBLZMA_SYM_CRCGEN: &CStr = c"CrcGenerateTable";
 const LIBLZMA_SYM_CRC64GEN: &CStr = c"Crc64GenerateTable";
