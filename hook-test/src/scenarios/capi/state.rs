@@ -90,7 +90,8 @@ pub(super) fn run() {
         45,
         "state check failed"
     );
-    let disabled_unintercept = unsafe { srx_inline_hook_unintercept(ptr::dangling_mut::<c_void>()) };
+    let disabled_unintercept =
+        unsafe { srx_inline_hook_unintercept(ptr::dangling_mut::<c_void>()) };
     assert_eq!(disabled_unintercept, -1, "state check failed");
     assert_eq!(
         unsafe { srx_inline_hook_get_errno() },
